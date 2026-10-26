@@ -1,0 +1,31 @@
+# ---- secrets: never commit ----
+.env
+.env.*
+!.env.example
+
+# ---- python environment ----
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# ---- caches ----
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# ---- data: rebuilt by scripts, not committed ----
+# (the synthetic ops corpus gets un-ignored in Phase 1, since it is ours)
+data/
+
+# ---- model weights / HF cache ----
+models/
+.cache/
+
+# ---- editors / OS ----
+.idea/
+.vscode/
+.DS_Store

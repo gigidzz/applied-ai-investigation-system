@@ -1,0 +1,37 @@
+[project]
+name = "ragsys"
+version = "0.1.0"
+description = "Agentic RAG system for multi-document retrieval, cross-referencing and evidence-grounded question answering"
+readme = "README.md"
+authors = [
+    { name = "dzimistarishviligigi", email = "dzimistarishviligigi@gmail.com" }
+]
+# Upper bound is deliberate: PyTorch publishes no wheels for 3.13+ yet, and
+# free hosting platforms run 3.12. Failing fast here beats failing at install time.
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "pydantic-settings>=2.16.1",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.5,<0.14.0"]
+build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+# E/F: pycodestyle + pyflakes, I: import sorting, UP: modern syntax,
+# B: likely bugs, SIM: simplifications
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.17.2",
+]
