@@ -1,0 +1,8 @@
+channel: #checkout
+date: 2026-06-22
+thread: THREAD-2026-06-22-checkout-api
+------------------------------------------------------------
+[17:28] r.achterberg: Merchant reports a missing payout for yesterday.
+[17:39] j.barros: Settlement ran late, see the operations report.
+[17:50] n.haddad: Confirmed, it landed this morning.
+[17:01] m.oyelaran: Replied to the merchant.

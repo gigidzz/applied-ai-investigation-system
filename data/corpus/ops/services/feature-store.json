@@ -1,0 +1,21 @@
+{
+  "name": "feature-store",
+  "team": "Risk",
+  "tier": 2,
+  "summary": "Serves precomputed risk features to fraud-scorer with a 5ms budget.",
+  "repository": "northwind/feature-store",
+  "on_call_rotation": "risk-oncall",
+  "depends_on": [
+    "redis-cluster"
+  ],
+  "depended_on_by": [
+    "fraud-scorer"
+  ],
+  "shared_infrastructure": {
+    "redis-cluster": {
+      "owner_team": "Platform",
+      "kind": "cache"
+    }
+  },
+  "catalogue_version": "2026-01-10"
+}

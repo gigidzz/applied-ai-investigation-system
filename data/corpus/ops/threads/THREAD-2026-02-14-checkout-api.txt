@@ -1,0 +1,8 @@
+channel: #checkout
+date: 2026-02-14
+thread: THREAD-2026-02-14-checkout-api
+------------------------------------------------------------
+[11:03] d.nakamura: Who owns payment-gateway these days?
+[11:14] m.oyelaran: Good question, the catalogue says one thing and I thought it changed.
+[11:25] n.haddad: Check the decision records, I think there was an ADR.
+[11:36] r.achterberg: Will follow up.

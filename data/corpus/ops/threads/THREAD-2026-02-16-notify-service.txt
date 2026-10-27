@@ -1,0 +1,8 @@
+channel: #platform
+date: 2026-02-16
+thread: THREAD-2026-02-16-notify-service
+------------------------------------------------------------
+[14:38] d.nakamura: Deploying notify-4.0.0 to notify-service in 10 minutes.
+[14:49] e.sorensen: Any schema changes?
+[14:00] m.oyelaran: No, config only.
+[14:11] t.lindqvist: Go ahead.

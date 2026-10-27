@@ -1,0 +1,8 @@
+channel: #payments-core
+date: 2026-03-16
+thread: THREAD-2026-03-16-settlement-worker
+------------------------------------------------------------
+[08:06] s.petrova: Anyone else seeing elevated latency on settlement-worker?
+[08:17] n.haddad: Checking now.
+[08:28] a.kovacs: Dashboard looks normal to me, p99 is 180ms.
+[08:39] j.barros: False alarm, it was my local network.

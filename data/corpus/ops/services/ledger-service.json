@@ -1,0 +1,24 @@
+{
+  "name": "ledger-service",
+  "team": "Payments Core",
+  "tier": 1,
+  "summary": "Double-entry ledger recording every authorisation, capture and refund.",
+  "repository": "northwind/ledger-service",
+  "on_call_rotation": "payments-core-oncall",
+  "depends_on": [
+    "postgres-primary"
+  ],
+  "depended_on_by": [
+    "payment-gateway",
+    "settlement-worker",
+    "merchant-portal",
+    "webhook-dispatcher"
+  ],
+  "shared_infrastructure": {
+    "postgres-primary": {
+      "owner_team": "Payments Core",
+      "kind": "database"
+    }
+  },
+  "catalogue_version": "2026-01-10"
+}

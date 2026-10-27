@@ -1,0 +1,8 @@
+channel: #compliance
+date: 2026-02-06
+thread: THREAD-2026-02-06-kyc-service
+------------------------------------------------------------
+[12:56] a.kovacs: Deploying kyc-4.5.0 to kyc-service in 10 minutes.
+[12:07] n.haddad: Any schema changes?
+[12:18] m.oyelaran: No, config only.
+[12:29] d.nakamura: Go ahead.

@@ -1,0 +1,8 @@
+channel: #merchant-experience
+date: 2026-06-07
+thread: THREAD-2026-06-07-merchant-portal
+------------------------------------------------------------
+[11:52] a.kovacs: Merchant reports a missing payout for yesterday.
+[11:03] j.barros: Settlement ran late, see the operations report.
+[11:14] l.mwangi: Confirmed, it landed this morning.
+[11:25] n.haddad: Replied to the merchant.

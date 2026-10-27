@@ -1,0 +1,16 @@
+{
+  "name": "checkout-api",
+  "team": "Checkout",
+  "tier": 1,
+  "summary": "Orchestrates the customer checkout flow and calls payment-gateway.",
+  "repository": "northwind/checkout-api",
+  "on_call_rotation": "checkout-oncall",
+  "depends_on": [
+    "payment-gateway",
+    "kyc-service",
+    "notify-service"
+  ],
+  "depended_on_by": [],
+  "shared_infrastructure": {},
+  "catalogue_version": "2026-01-10"
+}

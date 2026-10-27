@@ -1,0 +1,21 @@
+{
+  "name": "kyc-service",
+  "team": "Compliance",
+  "tier": 2,
+  "summary": "Verifies merchant identity documents against third-party registries.",
+  "repository": "northwind/kyc-service",
+  "on_call_rotation": "compliance-oncall",
+  "depends_on": [
+    "document-store"
+  ],
+  "depended_on_by": [
+    "checkout-api"
+  ],
+  "shared_infrastructure": {
+    "document-store": {
+      "owner_team": "Compliance",
+      "kind": "object storage"
+    }
+  },
+  "catalogue_version": "2026-01-10"
+}

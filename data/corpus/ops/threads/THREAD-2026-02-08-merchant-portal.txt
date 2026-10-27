@@ -1,0 +1,8 @@
+channel: #merchant-experience
+date: 2026-02-08
+thread: THREAD-2026-02-08-merchant-portal
+------------------------------------------------------------
+[13:35] r.achterberg: Can we raise the pool size on merchant-portal?
+[13:46] s.petrova: The runbook has a documented minimum, check it before changing.
+[13:57] j.barros: Right, 25. Current config is fine then.
+[13:08] t.lindqvist: Closing this.

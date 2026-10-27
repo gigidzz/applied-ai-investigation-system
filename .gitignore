@@ -17,9 +17,20 @@ dist/
 .mypy_cache/
 .ipynb_checkpoints/
 
-# ---- data: rebuilt by scripts, not committed ----
-# (the synthetic ops corpus gets un-ignored in Phase 1, since it is ours)
-data/
+# ---- data ----
+# Downloaded and derived corpora are rebuilt by scripts rather than committed.
+# The synthetic operations corpus is the exception: it is ours, it is small, and
+# the evaluation labels reference these exact files, so it must be versioned.
+# The rule: content we authored and that is small enough to read is versioned.
+# Content derived from third-party datasets is rebuilt by script instead.
+data/*
+!data/corpus/
+data/corpus/*
+!data/corpus/ops/
+!data/eval/
+data/eval/*
+!data/eval/ops_questions.jsonl
+# Analysis documents live in docs/, not here.
 
 # ---- model weights / HF cache ----
 models/

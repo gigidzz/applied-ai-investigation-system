@@ -1,0 +1,21 @@
+{
+  "name": "notify-service",
+  "team": "Platform",
+  "tier": 3,
+  "summary": "Sends transactional email and SMS to cardholders and merchants.",
+  "repository": "northwind/notify-service",
+  "on_call_rotation": "platform-oncall",
+  "depends_on": [
+    "email-relay"
+  ],
+  "depended_on_by": [
+    "checkout-api"
+  ],
+  "shared_infrastructure": {
+    "email-relay": {
+      "owner_team": "Platform",
+      "kind": "third party"
+    }
+  },
+  "catalogue_version": "2026-01-10"
+}

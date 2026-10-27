@@ -32,7 +32,7 @@ def test_defaults_are_sane() -> None:
     settings = IsolatedSettings()
     assert settings.corpus_dir.name == "corpus"
     assert settings.corpus_dir.is_absolute()
-    assert settings.chunk_size == 300
+    assert settings.chunk_size == 160
     assert settings.chunk_overlap < settings.chunk_size
     assert settings.embedding_dim == 384
 

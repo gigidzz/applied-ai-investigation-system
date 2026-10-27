@@ -1,0 +1,8 @@
+channel: #platform
+date: 2026-03-13
+thread: THREAD-2026-03-13-rate-limiter
+------------------------------------------------------------
+[10:45] t.lindqvist: Who owns redis-cluster these days?
+[10:56] j.barros: Good question, the catalogue says one thing and I thought it changed.
+[10:07] m.oyelaran: Check the decision records, I think there was an ADR.
+[10:18] r.achterberg: Will follow up.

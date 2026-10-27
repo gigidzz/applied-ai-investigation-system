@@ -1,0 +1,14 @@
+channel: #inc-payment-gateway
+date: 2026-03-14
+thread: THREAD-2026-03-14-incident
+------------------------------------------------------------
+[14:39] a.kovacs: Paged. Seeing 503s on authorise, about 40% of traffic.
+[14:41] s.petrova: Confirmed. Started around 14:32. Anything deployed?
+[14:42] r.achterberg: 4.2.1 went out at 14:20. Pool size change in there.
+[14:45] s.petrova: checkout-api breaker just opened. Merchant portal degraded too.
+[14:52] a.kovacs: pgbouncer shows cl_waiting climbing, pool is at 10/10 on every pod.
+[14:58] s.petrova: Rolling back 4.2.1. r.achterberg can you drive it?
+[15:02] r.achterberg: Rollback started.
+[15:40] r.achterberg: Rollback finished on all pods, errors are gone.
+[15:44] s.petrova: Agreed, calling it resolved. I will write the post-mortem.
+[16:05] l.mwangi: For the record this is the same class of failure as the April event.

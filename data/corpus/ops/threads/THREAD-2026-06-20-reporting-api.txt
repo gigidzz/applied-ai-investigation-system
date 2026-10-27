@@ -1,0 +1,8 @@
+channel: #merchant-experience
+date: 2026-06-20
+thread: THREAD-2026-06-20-reporting-api
+------------------------------------------------------------
+[11:49] s.petrova: reporting-api alert fired and self-resolved in 90 seconds.
+[11:00] n.haddad: Same thing happened on Tuesday.
+[11:11] d.nakamura: Raising it at the operations meeting.
+[11:22] r.achterberg: Added to the noisy-alert list.

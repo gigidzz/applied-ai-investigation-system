@@ -1,0 +1,8 @@
+channel: #platform
+date: 2026-03-18
+thread: THREAD-2026-03-18-rate-limiter
+------------------------------------------------------------
+[12:14] r.achterberg: Deploying rate-8.6.0 to rate-limiter in 10 minutes.
+[12:25] n.haddad: Any schema changes?
+[12:36] t.lindqvist: No, config only.
+[12:47] s.petrova: Go ahead.

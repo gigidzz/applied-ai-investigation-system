@@ -1,0 +1,16 @@
+{
+  "name": "merchant-portal",
+  "team": "Merchant Experience",
+  "tier": 2,
+  "summary": "Web application where merchants view transactions and payouts.",
+  "repository": "northwind/merchant-portal",
+  "on_call_rotation": "merchant-exp-oncall",
+  "depends_on": [
+    "payment-gateway",
+    "ledger-service",
+    "reporting-api"
+  ],
+  "depended_on_by": [],
+  "shared_infrastructure": {},
+  "catalogue_version": "2026-01-10"
+}

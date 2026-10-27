@@ -1,0 +1,8 @@
+channel: #platform
+date: 2026-04-25
+thread: THREAD-2026-04-25-notify-service
+------------------------------------------------------------
+[12:59] m.oyelaran: Can we raise the pool size on notify-service?
+[12:10] a.kovacs: The runbook has a documented minimum, check it before changing.
+[12:21] s.petrova: Right, 25. Current config is fine then.
+[12:32] e.sorensen: Closing this.

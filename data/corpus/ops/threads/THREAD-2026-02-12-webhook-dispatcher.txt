@@ -1,0 +1,8 @@
+channel: #platform
+date: 2026-02-12
+thread: THREAD-2026-02-12-webhook-dispatcher
+------------------------------------------------------------
+[08:42] s.petrova: Anyone else seeing elevated latency on webhook-dispatcher?
+[08:53] a.kovacs: Checking now.
+[08:04] n.haddad: Dashboard looks normal to me, p99 is 180ms.
+[08:15] e.sorensen: False alarm, it was my local network.

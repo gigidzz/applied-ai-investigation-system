@@ -1,0 +1,19 @@
+{
+  "name": "payment-gateway",
+  "team": "Payments Core",
+  "tier": 1,
+  "summary": "Edge service that authorises card payments against upstream acquirers.",
+  "repository": "northwind/payment-gateway",
+  "on_call_rotation": "payments-core-oncall",
+  "depends_on": [
+    "fraud-scorer",
+    "ledger-service",
+    "rate-limiter"
+  ],
+  "depended_on_by": [
+    "checkout-api",
+    "merchant-portal"
+  ],
+  "shared_infrastructure": {},
+  "catalogue_version": "2026-01-10"
+}

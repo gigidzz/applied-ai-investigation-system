@@ -1,0 +1,299 @@
+release,service,deployed_at,author,risk,rolled_back,summary
+paymen-7.2.3,payment-gateway,2026-01-02T14:06:00Z,s.petrova,low,no,Enable gzip compression on API responses.
+ledger-6.4.7,ledger-service,2026-01-04T08:06:00Z,e.sorensen,low,no,Upgrade the Postgres driver to 3.2.1.
+ledger-1.5.0,ledger-service,2026-01-05T08:45:00Z,e.sorensen,low,no,Increase HTTP client timeout from 2s to 5s for acquirer calls.
+checko-5.2.7,checkout-api,2026-01-05T11:59:00Z,l.mwangi,high,no,Reduce container memory request from 1Gi to 768Mi.
+mercha-6.2.6,merchant-portal,2026-01-05T14:26:00Z,e.sorensen,medium,no,Remove the deprecated v1 endpoints.
+paymen-5.7.6,payment-gateway,2026-01-05T19:56:00Z,e.sorensen,high,no,Add a circuit breaker around the fraud-scorer call.
+notify-3.5.7,notify-service,2026-01-06T16:27:00Z,r.achterberg,high,no,"Add a database index on (merchant_id, created_at)."
+notify-5.2.9,notify-service,2026-01-06T18:00:00Z,t.lindqvist,low,no,Split the authorisation handler into smaller functions.
+report-1.3.8,reporting-api,2026-01-07T15:20:00Z,a.kovacs,medium,no,Reduce container memory request from 1Gi to 768Mi.
+fraud-3.8.0,fraud-scorer,2026-01-09T13:55:00Z,r.achterberg,high,yes,Replace the retry helper with a shared library implementation.
+ledger-6.3.9,ledger-service,2026-01-10T08:48:00Z,n.haddad,high,no,Add structured request logging behind a feature flag.
+notify-9.3.9,notify-service,2026-01-10T11:09:00Z,t.lindqvist,low,no,Raise the connection pool from 10 to 50 after incident review.
+paymen-5.5.3,payment-gateway,2026-01-10T16:42:00Z,e.sorensen,low,no,Replace the retry helper with a shared library implementation.
+webhoo-4.2.9,webhook-dispatcher,2026-01-10T19:16:00Z,a.kovacs,medium,no,Add a circuit breaker around the fraud-scorer call.
+report-9.2.9,reporting-api,2026-01-12T07:12:00Z,m.oyelaran,low,no,Remove the deprecated v1 endpoints.
+settle-7.3.8,settlement-worker,2026-01-12T13:54:00Z,j.barros,low,no,Split the authorisation handler into smaller functions.
+featur-9.3.5,feature-store,2026-01-13T07:53:00Z,a.kovacs,low,no,Cache acquirer routing rules for 60 seconds.
+report-8.5.8,reporting-api,2026-01-13T12:49:00Z,e.sorensen,medium,no,Correct the timezone handling in the settlement cut-off calculation.
+ledger-7.2.8,ledger-service,2026-01-13T14:42:00Z,m.oyelaran,low,no,Bump base image to the January security patch level.
+settle-8.2.7,settlement-worker,2026-01-14T19:35:00Z,l.mwangi,medium,no,Migrate the config loader to environment variables.
+webhoo-4.5.6,webhook-dispatcher,2026-01-16T07:59:00Z,e.sorensen,medium,no,Split the authorisation handler into smaller functions.
+rate-7.2.8,rate-limiter,2026-01-16T12:35:00Z,n.haddad,low,no,Replace the retry helper with a shared library implementation.
+kyc-8.2.2,kyc-service,2026-01-17T10:46:00Z,j.barros,low,yes,Add a circuit breaker around the fraud-scorer call.
+paymen-3.4.9,payment-gateway,2026-01-18T17:26:00Z,a.kovacs,low,no,Increase HTTP client timeout from 2s to 5s for acquirer calls.
+webhoo-4.4.0,webhook-dispatcher,2026-01-18T18:27:00Z,s.petrova,low,yes,Remove the deprecated v1 endpoints.
+mercha-3.4.3,merchant-portal,2026-01-18T18:57:00Z,s.petrova,low,no,Add a readiness probe that checks database connectivity.
+settle-8.4.2,settlement-worker,2026-01-19T14:45:00Z,l.mwangi,medium,no,Correct the timezone handling in the settlement cut-off calculation.
+notify-4.4.1,notify-service,2026-01-20T10:21:00Z,j.barros,low,no,Add structured request logging behind a feature flag.
+settle-2.1.4,settlement-worker,2026-01-22T13:03:00Z,a.kovacs,medium,no,Bump base image to the January security patch level.
+report-5.4.1,reporting-api,2026-01-23T14:27:00Z,s.petrova,medium,no,Split the authorisation handler into smaller functions.
+paymen-1.6.4,payment-gateway,2026-01-25T19:59:00Z,j.barros,low,yes,Add a circuit breaker around the fraud-scorer call.
+fraud-2.2.8,fraud-scorer,2026-01-26T19:30:00Z,d.nakamura,low,yes,Raise the connection pool from 10 to 50 after incident review.
+webhoo-5.6.5,webhook-dispatcher,2026-01-26T19:47:00Z,a.kovacs,low,no,Add structured request logging behind a feature flag.
+webhoo-8.3.2,webhook-dispatcher,2026-01-28T14:02:00Z,r.achterberg,low,no,Add a circuit breaker around the fraud-scorer call.
+rate-9.3.7,rate-limiter,2026-01-28T14:46:00Z,j.barros,low,no,Bump base image to the January security patch level.
+mercha-2.3.2,merchant-portal,2026-01-30T11:42:00Z,d.nakamura,low,no,Replace the retry helper with a shared library implementation.
+featur-7.2.0,feature-store,2026-01-30T12:53:00Z,l.mwangi,medium,no,Correct the timezone handling in the settlement cut-off calculation.
+paymen-1.3.3,payment-gateway,2026-01-30T18:16:00Z,r.achterberg,medium,no,Bump base image to the January security patch level.
+notify-6.6.3,notify-service,2026-02-02T19:43:00Z,t.lindqvist,medium,no,Add a readiness probe that checks database connectivity.
+fraud-6.6.1,fraud-scorer,2026-02-03T11:04:00Z,e.sorensen,low,no,Bump base image to the January security patch level.
+rl-1.9.2,rate-limiter,2026-02-03T11:13:00Z,a.kovacs,high,no,Upgrade the Postgres driver to 3.2.1.
+kyc-8.4.0,kyc-service,2026-02-03T19:37:00Z,m.oyelaran,low,no,Reduce container memory request from 1Gi to 768Mi.
+kyc-6.3.2,kyc-service,2026-02-04T07:00:00Z,a.kovacs,low,no,Add structured request logging behind a feature flag.
+fraud-2.4.3,fraud-scorer,2026-02-04T10:12:00Z,j.barros,medium,no,Upgrade the Postgres driver to 3.2.1.
+kyc-2.5.4,kyc-service,2026-02-04T12:06:00Z,s.petrova,medium,no,Add per-merchant request metrics.
+checko-7.8.7,checkout-api,2026-02-04T14:30:00Z,r.achterberg,medium,no,Split the authorisation handler into smaller functions.
+checko-4.3.7,checkout-api,2026-02-05T14:23:00Z,e.sorensen,high,no,Reduce container memory request from 1Gi to 768Mi.
+mercha-8.5.2,merchant-portal,2026-02-06T17:19:00Z,a.kovacs,low,no,Replace the retry helper with a shared library implementation.
+fraud-7.5.1,fraud-scorer,2026-02-07T10:52:00Z,s.petrova,medium,no,Add an adaptive rate limiter for acquirer 429 responses.
+kyc-5.6.8,kyc-service,2026-02-07T13:24:00Z,l.mwangi,low,no,Add an adaptive rate limiter for acquirer 429 responses.
+paymen-3.10.2,payment-gateway,2026-02-14T07:00:00Z,r.achterberg,low,no,Add a readiness probe that checks database connectivity.
+featur-8.4.9,feature-store,2026-02-14T07:36:00Z,a.kovacs,low,no,Bump base image to the January security patch level.
+ledger-5.6.4,ledger-service,2026-02-14T14:08:00Z,d.nakamura,low,no,Replace the retry helper with a shared library implementation.
+paymen-9.9.6,payment-gateway,2026-02-14T16:15:00Z,l.mwangi,low,no,Add structured request logging behind a feature flag.
+checko-9.4.6,checkout-api,2026-02-15T07:13:00Z,n.haddad,low,no,Increase HTTP client timeout from 2s to 5s for acquirer calls.
+report-4.7.7,reporting-api,2026-02-15T11:15:00Z,j.barros,high,no,Add a readiness probe that checks database connectivity.
+featur-7.6.2,feature-store,2026-02-15T17:33:00Z,a.kovacs,low,no,Correct the timezone handling in the settlement cut-off calculation.
+featur-6.5.6,feature-store,2026-02-16T09:58:00Z,e.sorensen,low,no,Remove the deprecated v1 endpoints.
+settle-6.6.1,settlement-worker,2026-02-17T14:39:00Z,n.haddad,low,no,Enable gzip compression on API responses.
+checko-9.5.5,checkout-api,2026-02-19T12:34:00Z,n.haddad,low,no,Add per-merchant request metrics.
+mercha-9.7.5,merchant-portal,2026-02-19T17:11:00Z,n.haddad,low,no,Replace the retry helper with a shared library implementation.
+paymen-7.11.5,payment-gateway,2026-02-19T17:53:00Z,t.lindqvist,low,no,Add an adaptive rate limiter for acquirer 429 responses.
+ledger-4.7.9,ledger-service,2026-02-19T19:53:00Z,r.achterberg,medium,no,Correct the timezone handling in the settlement cut-off calculation.
+mercha-5.6.2,merchant-portal,2026-02-20T12:23:00Z,r.achterberg,low,no,Remove the deprecated v1 endpoints.
+paymen-9.8.6,payment-gateway,2026-02-20T16:21:00Z,a.kovacs,low,no,Cache acquirer routing rules for 60 seconds.
+report-3.8.2,reporting-api,2026-02-22T19:23:00Z,d.nakamura,low,no,Add structured request logging behind a feature flag.
+ledger-7.8.2,ledger-service,2026-02-24T09:40:00Z,d.nakamura,high,no,Split the authorisation handler into smaller functions.
+rate-9.5.4,rate-limiter,2026-02-24T10:59:00Z,t.lindqvist,high,no,Add a circuit breaker around the fraud-scorer call.
+notify-5.0.1,notify-service,2026-02-26T12:16:00Z,m.oyelaran,medium,no,Remove the deprecated v1 endpoints.
+fraud-9.3.3,fraud-scorer,2026-02-26T13:50:00Z,d.nakamura,low,no,Replace the retry helper with a shared library implementation.
+settle-1.5.5,settlement-worker,2026-02-27T16:38:00Z,s.petrova,low,no,Add per-merchant request metrics.
+checko-7.7.1,checkout-api,2026-02-28T07:44:00Z,t.lindqvist,medium,no,Bump base image to the January security patch level.
+webhoo-4.7.9,webhook-dispatcher,2026-02-28T10:00:00Z,e.sorensen,low,no,Add an adaptive rate limiter for acquirer 429 responses.
+checko-9.6.6,checkout-api,2026-02-28T13:08:00Z,j.barros,low,no,Raise the connection pool from 10 to 50 after incident review.
+report-8.6.3,reporting-api,2026-02-28T16:52:00Z,l.mwangi,high,no,Cache acquirer routing rules for 60 seconds.
+rate-2.4.9,rate-limiter,2026-02-28T19:36:00Z,s.petrova,low,no,Add a circuit breaker around the fraud-scorer call.
+fraud-7.9.3,fraud-scorer,2026-03-02T11:46:00Z,l.mwangi,low,no,Split the authorisation handler into smaller functions.
+fraud-6.8.7,fraud-scorer,2026-03-03T17:09:00Z,e.sorensen,high,no,Reduce container memory request from 1Gi to 768Mi.
+kyc-9.11.9,kyc-service,2026-03-04T16:20:00Z,n.haddad,low,no,"Add a database index on (merchant_id, created_at)."
+checko-3.9.1,checkout-api,2026-03-05T14:26:00Z,j.barros,high,no,Add a circuit breaker around the fraud-scorer call.
+featur-4.7.5,feature-store,2026-03-05T19:10:00Z,t.lindqvist,medium,no,Add an adaptive rate limiter for acquirer 429 responses.
+ledger-9.10.4,ledger-service,2026-03-06T07:15:00Z,d.nakamura,low,no,Replace the retry helper with a shared library implementation.
+mercha-1.10.3,merchant-portal,2026-03-07T07:33:00Z,s.petrova,low,no,Replace the retry helper with a shared library implementation.
+checko-8.10.3,checkout-api,2026-03-08T14:33:00Z,l.mwangi,low,no,Add structured request logging behind a feature flag.
+report-4.9.4,reporting-api,2026-03-09T07:01:00Z,s.petrova,low,no,Split the authorisation handler into smaller functions.
+mercha-5.8.3,merchant-portal,2026-03-09T11:07:00Z,e.sorensen,low,no,Remove the deprecated v1 endpoints.
+ledger-7.9.0,ledger-service,2026-03-10T08:24:00Z,s.petrova,low,no,Add an adaptive rate limiter for acquirer 429 responses.
+notify-2.10.5,notify-service,2026-03-10T18:31:00Z,m.oyelaran,medium,no,Add an adaptive rate limiter for acquirer 429 responses.
+notify-9.11.6,notify-service,2026-03-11T14:49:00Z,d.nakamura,medium,no,Add an adaptive rate limiter for acquirer 429 responses.
+kyc-5.7.3,kyc-service,2026-03-13T08:43:00Z,d.nakamura,low,no,Add an adaptive rate limiter for acquirer 429 responses.
+kyc-7.10.7,kyc-service,2026-03-13T12:09:00Z,l.mwangi,medium,no,Replace the retry helper with a shared library implementation.
+rate-3.6.3,rate-limiter,2026-03-13T19:58:00Z,r.achterberg,medium,no,Increase HTTP client timeout from 2s to 5s for acquirer calls.
+rate-3.7.8,rate-limiter,2026-03-14T08:10:00Z,j.barros,low,yes,Add a circuit breaker around the fraud-scorer call.
+notify-1.9.3,notify-service,2026-03-14T08:30:00Z,l.mwangi,low,no,Add structured request logging behind a feature flag.
+pay-gw-4.2.1,payment-gateway,2026-03-14T14:20:00Z,r.achterberg,medium,yes,Upgrade pgbouncer client library to 3.4.0 and reduce the per-pod connection pool from 50 to 10 to cut idle connections.
+checko-1.11.0,checkout-api,2026-03-16T11:05:00Z,n.haddad,medium,no,Upgrade the Postgres driver to 3.2.1.
+notify-2.8.6,notify-service,2026-03-17T15:18:00Z,n.haddad,medium,no,Split the authorisation handler into smaller functions.
+notify-8.7.6,notify-service,2026-03-18T13:04:00Z,d.nakamura,low,no,Raise the connection pool from 10 to 50 after incident review.
+checko-6.1.8,checkout-api,2026-03-18T15:59:00Z,l.mwangi,low,no,Cache acquirer routing rules for 60 seconds.
+rate-2.8.4,rate-limiter,2026-03-18T16:06:00Z,e.sorensen,low,no,Correct the timezone handling in the settlement cut-off calculation.
+webhoo-8.8.7,webhook-dispatcher,2026-03-19T18:13:00Z,a.kovacs,medium,no,Increase HTTP client timeout from 2s to 5s for acquirer calls.
+paymen-6.2.6,payment-gateway,2026-03-20T12:06:00Z,r.achterberg,low,no,Replace the retry helper with a shared library implementation.
+wh-2.6.0,webhook-dispatcher,2026-03-21T10:16:00Z,m.oyelaran,medium,no,Increase HTTP client timeout from 2s to 5s for acquirer calls.
+paymen-5.1.8,payment-gateway,2026-03-22T07:29:00Z,e.sorensen,low,no,Add an adaptive rate limiter for acquirer 429 responses.
+paymen-7.0.2,payment-gateway,2026-03-22T12:03:00Z,m.oyelaran,medium,no,Add an adaptive rate limiter for acquirer 429 responses.
+kyc-9.9.5,kyc-service,2026-03-22T19:28:00Z,d.nakamura,low,no,Add a readiness probe that checks database connectivity.
+webhoo-7.9.8,webhook-dispatcher,2026-03-25T14:28:00Z,d.nakamura,high,no,Correct the timezone handling in the settlement cut-off calculation.
+checko-7.0.0,checkout-api,2026-03-25T19:14:00Z,d.nakamura,medium,no,Add an adaptive rate limiter for acquirer 429 responses.
+settle-7.7.9,settlement-worker,2026-03-27T10:07:00Z,s.petrova,medium,no,"Add a database index on (merchant_id, created_at)."
+notify-6.0.6,notify-service,2026-03-27T11:16:00Z,l.mwangi,medium,no,Correct the timezone handling in the settlement cut-off calculation.
+mercha-4.9.3,merchant-portal,2026-03-28T12:28:00Z,r.achterberg,low,no,"Add a database index on (merchant_id, created_at)."
+webhoo-4.10.9,webhook-dispatcher,2026-03-28T14:42:00Z,j.barros,medium,no,Correct the timezone handling in the settlement cut-off calculation.
+kyc-6.8.1,kyc-service,2026-03-30T08:55:00Z,a.kovacs,medium,no,Add structured request logging behind a feature flag.
+fraud-9.7.3,fraud-scorer,2026-03-30T14:03:00Z,r.achterberg,low,no,Enable gzip compression on API responses.
+notify-6.2.2,notify-service,2026-04-01T10:35:00Z,t.lindqvist,medium,yes,Add structured request logging behind a feature flag.
+featur-7.11.1,feature-store,2026-04-01T19:07:00Z,r.achterberg,low,no,Add an adaptive rate limiter for acquirer 429 responses.
+checko-8.4.0,checkout-api,2026-04-04T13:55:00Z,n.haddad,low,no,Upgrade the Postgres driver to 3.2.1.
+notify-2.1.9,notify-service,2026-04-05T17:27:00Z,d.nakamura,low,no,Reduce container memory request from 1Gi to 768Mi.
+kyc-8.1.9,kyc-service,2026-04-06T11:27:00Z,d.nakamura,low,no,Enable gzip compression on API responses.
+featur-4.2.9,feature-store,2026-04-06T12:09:00Z,j.barros,low,yes,Bump base image to the January security patch level.
+webhoo-7.0.8,webhook-dispatcher,2026-04-06T13:17:00Z,e.sorensen,low,no,Enable gzip compression on API responses.
+mercha-3.1.6,merchant-portal,2026-04-06T18:16:00Z,t.lindqvist,low,no,Add per-merchant request metrics.
+paymen-9.3.8,payment-gateway,2026-04-06T19:37:00Z,n.haddad,medium,no,Split the authorisation handler into smaller functions.
+notify-6.3.4,notify-service,2026-04-08T11:03:00Z,n.haddad,low,no,Correct the timezone handling in the settlement cut-off calculation.
+report-1.11.2,reporting-api,2026-04-08T15:20:00Z,a.kovacs,medium,no,Reduce container memory request from 1Gi to 768Mi.
+featur-4.9.6,feature-store,2026-04-08T17:27:00Z,r.achterberg,low,no,Enable gzip compression on API responses.
+fraud-5.1.7,fraud-scorer,2026-04-10T17:45:00Z,m.oyelaran,medium,no,Bump base image to the January security patch level.
+rate-7.10.7,rate-limiter,2026-04-11T08:34:00Z,d.nakamura,low,no,"Add a database index on (merchant_id, created_at)."
+fraud-4.10.3,fraud-scorer,2026-04-11T09:42:00Z,n.haddad,medium,no,Correct the timezone handling in the settlement cut-off calculation.
+mercha-6.11.4,merchant-portal,2026-04-11T14:02:00Z,s.petrova,low,no,Correct the timezone handling in the settlement cut-off calculation.
+report-5.10.8,reporting-api,2026-04-12T12:19:00Z,d.nakamura,medium,no,Enable gzip compression on API responses.
+rate-6.9.0,rate-limiter,2026-04-12T17:24:00Z,a.kovacs,low,yes,Cache acquirer routing rules for 60 seconds.
+webhoo-2.11.8,webhook-dispatcher,2026-04-17T10:11:00Z,t.lindqvist,medium,no,Add an adaptive rate limiter for acquirer 429 responses.
+mercha-3.0.8,merchant-portal,2026-04-18T15:18:00Z,l.mwangi,high,no,Cache acquirer routing rules for 60 seconds.
+featur-5.1.8,feature-store,2026-04-19T15:51:00Z,e.sorensen,high,no,Enable gzip compression on API responses.
+kyc-5.0.1,kyc-service,2026-04-19T17:13:00Z,e.sorensen,medium,no,Add structured request logging behind a feature flag.
+notify-5.4.3,notify-service,2026-04-21T07:35:00Z,e.sorensen,low,no,Add an adaptive rate limiter for acquirer 429 responses.
+fraud-9.11.2,fraud-scorer,2026-04-21T14:41:00Z,a.kovacs,low,no,Cache acquirer routing rules for 60 seconds.
+settle-4.10.8,settlement-worker,2026-04-21T15:36:00Z,l.mwangi,medium,yes,Upgrade the Postgres driver to 3.2.1.
+settle-6.8.8,settlement-worker,2026-04-22T10:28:00Z,s.petrova,medium,yes,Bump base image to the January security patch level.
+checko-5.2.2,checkout-api,2026-04-23T09:19:00Z,d.nakamura,medium,no,Correct the timezone handling in the settlement cut-off calculation.
+settle-9.9.6,settlement-worker,2026-04-23T10:45:00Z,s.petrova,low,no,Replace the retry helper with a shared library implementation.
+report-5.0.5,reporting-api,2026-04-23T19:02:00Z,n.haddad,low,no,Increase HTTP client timeout from 2s to 5s for acquirer calls.
+kyc-6.2.7,kyc-service,2026-04-23T19:06:00Z,d.nakamura,high,no,Upgrade the Postgres driver to 3.2.1.
+featur-3.0.5,feature-store,2026-04-26T16:43:00Z,a.kovacs,medium,no,Migrate the config loader to environment variables.
+fraud-7.0.1,fraud-scorer,2026-04-27T13:27:00Z,t.lindqvist,medium,no,Bump base image to the January security patch level.
+featur-6.8.5,feature-store,2026-04-27T17:57:00Z,d.nakamura,high,no,Reduce container memory request from 1Gi to 768Mi.
+featur-3.10.8,feature-store,2026-04-27T18:11:00Z,t.lindqvist,low,no,Enable gzip compression on API responses.
+checko-2.3.7,checkout-api,2026-04-28T08:59:00Z,l.mwangi,low,no,Replace the retry helper with a shared library implementation.
+featur-7.3.5,feature-store,2026-04-29T07:29:00Z,t.lindqvist,low,no,Replace the retry helper with a shared library implementation.
+webhoo-7.1.0,webhook-dispatcher,2026-05-01T15:35:00Z,m.oyelaran,medium,no,Split the authorisation handler into smaller functions.
+notify-6.5.6,notify-service,2026-05-03T07:09:00Z,m.oyelaran,medium,no,Add an adaptive rate limiter for acquirer 429 responses.
+fraud-6.4.1,fraud-scorer,2026-05-03T11:12:00Z,l.mwangi,medium,no,Add an adaptive rate limiter for acquirer 429 responses.
+paymen-9.6.5,payment-gateway,2026-05-05T07:16:00Z,n.haddad,medium,no,Split the authorisation handler into smaller functions.
+checko-9.5.0,checkout-api,2026-05-07T09:41:00Z,r.achterberg,low,no,Add a circuit breaker around the fraud-scorer call.
+rate-6.11.7,rate-limiter,2026-05-07T13:15:00Z,l.mwangi,low,no,Add per-merchant request metrics.
+checko-8.7.5,checkout-api,2026-05-08T11:54:00Z,j.barros,low,no,Remove the deprecated v1 endpoints.
+fraud-9.2.5,fraud-scorer,2026-05-09T10:35:00Z,r.achterberg,medium,no,Raise the connection pool from 10 to 50 after incident review.
+rate-4.0.2,rate-limiter,2026-05-09T12:31:00Z,t.lindqvist,high,no,Upgrade the Postgres driver to 3.2.1.
+fraud-4.3.9,fraud-scorer,2026-05-09T15:56:00Z,r.achterberg,low,no,Add a readiness probe that checks database connectivity.
+ledger-8.0.3,ledger-service,2026-05-10T14:20:00Z,t.lindqvist,low,yes,Migrate the config loader to environment variables.
+checkout-7.3.0,checkout-api,2026-05-11T11:23:00Z,t.lindqvist,high,no,Correct the timezone handling in the settlement cut-off calculation.
+settle-1.11.4,settlement-worker,2026-05-11T15:44:00Z,m.oyelaran,low,no,Migrate the config loader to environment variables.
+notify-5.8.5,notify-service,2026-05-14T15:51:00Z,r.achterberg,low,no,Correct the timezone handling in the settlement cut-off calculation.
+checko-8.6.8,checkout-api,2026-05-15T09:06:00Z,e.sorensen,low,no,Remove the deprecated v1 endpoints.
+paymen-1.4.4,payment-gateway,2026-05-15T11:37:00Z,l.mwangi,medium,no,Increase HTTP client timeout from 2s to 5s for acquirer calls.
+report-1.2.1,reporting-api,2026-05-16T13:23:00Z,t.lindqvist,low,no,Upgrade the Postgres driver to 3.2.1.
+paymen-1.8.5,payment-gateway,2026-05-19T07:12:00Z,n.haddad,medium,no,Cache acquirer routing rules for 60 seconds.
+paymen-7.5.9,payment-gateway,2026-05-19T12:13:00Z,e.sorensen,low,no,Remove the deprecated v1 endpoints.
+notify-6.6.3,notify-service,2026-05-20T18:12:00Z,j.barros,medium,yes,Cache acquirer routing rules for 60 seconds.
+report-5.3.8,reporting-api,2026-05-21T13:44:00Z,d.nakamura,low,yes,"Add a database index on (merchant_id, created_at)."
+ledger-7.11.9,ledger-service,2026-05-22T17:48:00Z,e.sorensen,low,no,Add a circuit breaker around the fraud-scorer call.
+webhoo-9.4.3,webhook-dispatcher,2026-05-23T07:07:00Z,e.sorensen,low,no,Add structured request logging behind a feature flag.
+settle-2.0.3,settlement-worker,2026-05-23T11:33:00Z,r.achterberg,high,no,Add an adaptive rate limiter for acquirer 429 responses.
+paymen-3.7.4,payment-gateway,2026-05-23T11:46:00Z,e.sorensen,medium,no,Add structured request logging behind a feature flag.
+rate-2.1.7,rate-limiter,2026-05-24T13:40:00Z,m.oyelaran,low,no,Raise the connection pool from 10 to 50 after incident review.
+notify-5.9.6,notify-service,2026-05-24T19:38:00Z,l.mwangi,high,no,"Add a database index on (merchant_id, created_at)."
+settle-1.1.4,settlement-worker,2026-05-24T19:46:00Z,a.kovacs,medium,no,Split the authorisation handler into smaller functions.
+featur-2.4.5,feature-store,2026-05-25T18:40:00Z,j.barros,low,no,Remove the deprecated v1 endpoints.
+webhoo-4.2.2,webhook-dispatcher,2026-05-26T14:20:00Z,d.nakamura,low,no,Correct the timezone handling in the settlement cut-off calculation.
+webhoo-5.3.1,webhook-dispatcher,2026-05-26T19:12:00Z,t.lindqvist,low,no,Raise the connection pool from 10 to 50 after incident review.
+report-4.1.6,reporting-api,2026-05-27T17:51:00Z,d.nakamura,medium,no,Add a circuit breaker around the fraud-scorer call.
+mercha-3.4.7,merchant-portal,2026-05-28T12:32:00Z,m.oyelaran,low,no,Reduce container memory request from 1Gi to 768Mi.
+portal-4.0.2,merchant-portal,2026-05-29T09:16:00Z,t.lindqvist,medium,yes,Split the authorisation handler into smaller functions.
+checko-6.8.4,checkout-api,2026-05-29T14:03:00Z,t.lindqvist,low,no,Correct the timezone handling in the settlement cut-off calculation.
+mercha-8.3.3,merchant-portal,2026-05-30T12:14:00Z,e.sorensen,low,no,Add structured request logging behind a feature flag.
+mercha-7.2.8,merchant-portal,2026-05-30T13:02:00Z,d.nakamura,medium,yes,Increase HTTP client timeout from 2s to 5s for acquirer calls.
+notify-6.7.2,notify-service,2026-05-31T15:28:00Z,a.kovacs,medium,no,Enable gzip compression on API responses.
+featur-2.7.7,feature-store,2026-06-01T17:45:00Z,s.petrova,high,no,Migrate the config loader to environment variables.
+rate-9.3.3,rate-limiter,2026-06-02T10:09:00Z,s.petrova,low,no,Add an adaptive rate limiter for acquirer 429 responses.
+paymen-3.10.5,payment-gateway,2026-06-02T16:00:00Z,s.petrova,low,no,Add an adaptive rate limiter for acquirer 429 responses.
+ledger-2.2.6,ledger-service,2026-06-03T08:40:00Z,m.oyelaran,medium,no,Add structured request logging behind a feature flag.
+report-4.4.4,reporting-api,2026-06-05T14:30:00Z,m.oyelaran,low,no,Correct the timezone handling in the settlement cut-off calculation.
+settle-4.3.0,settlement-worker,2026-06-06T18:42:00Z,j.barros,medium,no,Bump base image to the January security patch level.
+mercha-5.5.3,merchant-portal,2026-06-08T09:04:00Z,t.lindqvist,medium,no,Cache acquirer routing rules for 60 seconds.
+report-4.5.9,reporting-api,2026-06-08T09:26:00Z,m.oyelaran,high,no,Add structured request logging behind a feature flag.
+webhoo-5.8.9,webhook-dispatcher,2026-06-08T12:17:00Z,t.lindqvist,low,no,Migrate the config loader to environment variables.
+rate-8.4.7,rate-limiter,2026-06-08T18:52:00Z,l.mwangi,high,no,Add structured request logging behind a feature flag.
+webhoo-3.7.5,webhook-dispatcher,2026-06-09T19:04:00Z,e.sorensen,low,no,Upgrade the Postgres driver to 3.2.1.
+paymen-1.11.2,payment-gateway,2026-06-10T10:00:00Z,r.achterberg,medium,no,Add per-merchant request metrics.
+fraud-3.6.0,fraud-scorer,2026-06-11T10:21:00Z,e.sorensen,medium,yes,Upgrade the Postgres driver to 3.2.1.
+webhoo-5.5.7,webhook-dispatcher,2026-06-11T10:59:00Z,d.nakamura,medium,no,Add a circuit breaker around the fraud-scorer call.
+checko-3.9.1,checkout-api,2026-06-13T15:06:00Z,m.oyelaran,low,no,Add an adaptive rate limiter for acquirer 429 responses.
+ledger-4.1.3,ledger-service,2026-06-15T09:13:00Z,d.nakamura,low,no,Raise the connection pool from 10 to 50 after incident review.
+mercha-6.6.2,merchant-portal,2026-06-15T09:33:00Z,l.mwangi,medium,no,Cache acquirer routing rules for 60 seconds.
+rate-1.5.7,rate-limiter,2026-06-15T12:45:00Z,t.lindqvist,medium,no,Bump base image to the January security patch level.
+checko-3.11.0,checkout-api,2026-06-15T16:47:00Z,t.lindqvist,medium,no,Bump base image to the January security patch level.
+kyc-6.3.1,kyc-service,2026-06-16T08:56:00Z,m.oyelaran,medium,no,Split the authorisation handler into smaller functions.
+rate-2.6.6,rate-limiter,2026-06-16T18:06:00Z,r.achterberg,medium,yes,Upgrade the Postgres driver to 3.2.1.
+webhoo-6.10.9,webhook-dispatcher,2026-06-17T10:36:00Z,r.achterberg,low,no,Migrate the config loader to environment variables.
+notify-8.10.9,notify-service,2026-06-19T09:05:00Z,t.lindqvist,low,no,Add structured request logging behind a feature flag.
+fraud-7.5.6,fraud-scorer,2026-06-19T11:02:00Z,e.sorensen,high,no,"Add a database index on (merchant_id, created_at)."
+kyc-4.4.4,kyc-service,2026-06-19T11:02:00Z,j.barros,low,no,Split the authorisation handler into smaller functions.
+rate-3.2.7,rate-limiter,2026-06-20T11:07:00Z,n.haddad,high,no,Bump base image to the January security patch level.
+settle-1.2.6,settlement-worker,2026-06-21T07:33:00Z,n.haddad,low,no,Enable gzip compression on API responses.
+paymen-5.9.9,payment-gateway,2026-06-25T10:48:00Z,d.nakamura,medium,no,Remove the deprecated v1 endpoints.
+notify-1.0.0,notify-service,2026-06-26T07:26:00Z,l.mwangi,low,no,Add an adaptive rate limiter for acquirer 429 responses.
+featur-6.5.1,feature-store,2026-06-27T16:50:00Z,r.achterberg,medium,no,Add a circuit breaker around the fraud-scorer call.
+webhoo-4.9.9,webhook-dispatcher,2026-06-27T17:54:00Z,t.lindqvist,high,no,Add structured request logging behind a feature flag.
+featur-1.6.7,feature-store,2026-06-27T18:20:00Z,e.sorensen,low,no,Add a circuit breaker around the fraud-scorer call.
+notify-5.11.6,notify-service,2026-06-28T17:40:00Z,j.barros,medium,no,Split the authorisation handler into smaller functions.
+webhoo-1.6.2,webhook-dispatcher,2026-06-29T12:00:00Z,t.lindqvist,medium,no,"Add a database index on (merchant_id, created_at)."
+kyc-5.5.2,kyc-service,2026-06-30T07:59:00Z,m.oyelaran,low,no,Cache acquirer routing rules for 60 seconds.
+checko-5.10.7,checkout-api,2026-06-30T08:31:00Z,j.barros,low,no,Reduce container memory request from 1Gi to 768Mi.
+pay-gw-4.6.0,payment-gateway,2026-06-30T11:44:00Z,r.achterberg,high,no,Add an adaptive rate limiter for acquirer 429 responses.
+ledger-6.3.3,ledger-service,2026-07-04T13:11:00Z,j.barros,low,no,Cache acquirer routing rules for 60 seconds.
+fraud-5.8.8,fraud-scorer,2026-07-05T13:21:00Z,e.sorensen,low,no,Replace the retry helper with a shared library implementation.
+settle-3.5.4,settlement-worker,2026-07-06T17:09:00Z,d.nakamura,low,no,Upgrade the Postgres driver to 3.2.1.
+featur-5.8.8,feature-store,2026-07-07T17:21:00Z,m.oyelaran,high,no,Add an adaptive rate limiter for acquirer 429 responses.
+paymen-5.5.7,payment-gateway,2026-07-08T07:54:00Z,e.sorensen,low,no,Migrate the config loader to environment variables.
+kyc-6.7.7,kyc-service,2026-07-08T08:49:00Z,s.petrova,low,no,Remove the deprecated v1 endpoints.
+notify-9.3.2,notify-service,2026-07-08T19:45:00Z,s.petrova,low,no,Increase HTTP client timeout from 2s to 5s for acquirer calls.
+featur-3.9.2,feature-store,2026-07-09T07:08:00Z,n.haddad,low,no,Add a readiness probe that checks database connectivity.
+kyc-9.6.5,kyc-service,2026-07-09T09:52:00Z,s.petrova,low,no,Add a readiness probe that checks database connectivity.
+webhoo-4.11.6,webhook-dispatcher,2026-07-10T10:13:00Z,l.mwangi,high,no,Replace the retry helper with a shared library implementation.
+rate-5.8.6,rate-limiter,2026-07-10T12:04:00Z,a.kovacs,low,no,Upgrade the Postgres driver to 3.2.1.
+settle-8.6.5,settlement-worker,2026-07-10T13:00:00Z,e.sorensen,medium,no,Add a readiness probe that checks database connectivity.
+kyc-2.9.6,kyc-service,2026-07-12T13:15:00Z,m.oyelaran,low,no,Correct the timezone handling in the settlement cut-off calculation.
+featur-5.11.1,feature-store,2026-07-13T11:37:00Z,s.petrova,high,no,Increase HTTP client timeout from 2s to 5s for acquirer calls.
+checko-5.1.2,checkout-api,2026-07-13T15:42:00Z,a.kovacs,high,no,Reduce container memory request from 1Gi to 768Mi.
+paymen-8.2.1,payment-gateway,2026-07-14T10:34:00Z,e.sorensen,medium,no,Split the authorisation handler into smaller functions.
+settle-5.7.9,settlement-worker,2026-07-14T17:11:00Z,j.barros,low,no,Cache acquirer routing rules for 60 seconds.
+checko-3.0.9,checkout-api,2026-07-14T19:30:00Z,a.kovacs,medium,no,Enable gzip compression on API responses.
+checko-1.2.9,checkout-api,2026-07-15T11:09:00Z,d.nakamura,medium,no,Add a readiness probe that checks database connectivity.
+paymen-4.0.9,payment-gateway,2026-07-16T13:14:00Z,d.nakamura,low,no,Enable gzip compression on API responses.
+rate-3.9.3,rate-limiter,2026-07-16T16:11:00Z,e.sorensen,high,no,Add structured request logging behind a feature flag.
+featur-8.10.6,feature-store,2026-07-17T13:59:00Z,d.nakamura,low,no,Add an adaptive rate limiter for acquirer 429 responses.
+notify-9.4.6,notify-service,2026-07-19T10:26:00Z,s.petrova,medium,no,Cache acquirer routing rules for 60 seconds.
+ledger-9.2.0,ledger-service,2026-07-19T13:27:00Z,n.haddad,medium,no,Increase HTTP client timeout from 2s to 5s for acquirer calls.
+mercha-7.7.6,merchant-portal,2026-07-20T07:08:00Z,n.haddad,low,no,Add a circuit breaker around the fraud-scorer call.
+notify-2.2.9,notify-service,2026-07-21T11:22:00Z,m.oyelaran,low,no,"Add a database index on (merchant_id, created_at)."
+mercha-4.8.4,merchant-portal,2026-07-22T10:16:00Z,r.achterberg,low,no,Add a readiness probe that checks database connectivity.
+kyc-2.10.2,kyc-service,2026-07-22T10:55:00Z,m.oyelaran,medium,no,Bump base image to the January security patch level.
+notify-6.1.5,notify-service,2026-07-23T08:06:00Z,s.petrova,low,no,Increase HTTP client timeout from 2s to 5s for acquirer calls.
+rate-4.7.9,rate-limiter,2026-07-23T12:42:00Z,l.mwangi,low,no,Replace the retry helper with a shared library implementation.
+kyc-8.8.4,kyc-service,2026-07-25T13:39:00Z,d.nakamura,low,no,Add a circuit breaker around the fraud-scorer call.
+settle-8.4.2,settlement-worker,2026-07-26T11:24:00Z,j.barros,low,no,Add per-merchant request metrics.
+paymen-7.4.6,payment-gateway,2026-07-27T12:50:00Z,j.barros,low,no,Add a circuit breaker around the fraud-scorer call.
+paymen-9.3.9,payment-gateway,2026-07-27T13:15:00Z,e.sorensen,high,no,"Add a database index on (merchant_id, created_at)."
+mercha-2.9.8,merchant-portal,2026-07-29T17:45:00Z,m.oyelaran,high,no,Add a readiness probe that checks database connectivity.
+paymen-9.1.8,payment-gateway,2026-07-30T12:20:00Z,a.kovacs,low,no,Reduce container memory request from 1Gi to 768Mi.
+fraud-4.7.4,fraud-scorer,2026-07-30T17:24:00Z,r.achterberg,low,no,Add a circuit breaker around the fraud-scorer call.
+paymen-6.6.3,payment-gateway,2026-08-01T13:27:00Z,s.petrova,low,no,Reduce container memory request from 1Gi to 768Mi.
+ledger-6.4.4,ledger-service,2026-08-02T16:02:00Z,e.sorensen,low,yes,Add per-merchant request metrics.
+paymen-5.7.0,payment-gateway,2026-08-03T13:41:00Z,e.sorensen,medium,no,Migrate the config loader to environment variables.
+notify-6.5.8,notify-service,2026-08-03T17:52:00Z,m.oyelaran,low,no,Correct the timezone handling in the settlement cut-off calculation.
+notify-2.7.9,notify-service,2026-08-04T08:33:00Z,a.kovacs,medium,no,Raise the connection pool from 10 to 50 after incident review.
+paymen-9.8.7,payment-gateway,2026-08-04T11:24:00Z,t.lindqvist,medium,no,Bump base image to the January security patch level.
+kyc-7.0.3,kyc-service,2026-08-04T16:22:00Z,r.achterberg,high,yes,Add an adaptive rate limiter for acquirer 429 responses.
+notify-6.9.9,notify-service,2026-08-05T14:07:00Z,s.petrova,low,no,Remove the deprecated v1 endpoints.
+mercha-5.0.3,merchant-portal,2026-08-05T18:13:00Z,j.barros,low,no,Raise the connection pool from 10 to 50 after incident review.
+kyc-9.11.7,kyc-service,2026-08-06T15:38:00Z,d.nakamura,medium,no,Enable gzip compression on API responses.
+ledger-3.8.0,ledger-service,2026-08-07T11:21:00Z,m.oyelaran,medium,no,Add a circuit breaker around the fraud-scorer call.
+notify-2.8.5,notify-service,2026-08-08T11:26:00Z,j.barros,high,no,Increase HTTP client timeout from 2s to 5s for acquirer calls.
+settle-9.9.2,settlement-worker,2026-08-08T16:15:00Z,s.petrova,medium,no,"Add a database index on (merchant_id, created_at)."
+mercha-6.11.8,merchant-portal,2026-08-09T08:27:00Z,j.barros,medium,no,Migrate the config loader to environment variables.
+ledger-8.5.8,ledger-service,2026-08-09T12:41:00Z,t.lindqvist,low,no,Enable gzip compression on API responses.
+fraud-8.10.3,fraud-scorer,2026-08-09T13:50:00Z,a.kovacs,low,no,Bump base image to the January security patch level.
+notify-5.10.3,notify-service,2026-08-09T15:38:00Z,l.mwangi,high,no,Add an adaptive rate limiter for acquirer 429 responses.
+paymen-7.9.3,payment-gateway,2026-08-09T18:31:00Z,r.achterberg,low,no,Add per-merchant request metrics.
+report-2.6.6,reporting-api,2026-08-09T19:16:00Z,n.haddad,low,no,Raise the connection pool from 10 to 50 after incident review.
+report-9.8.2,reporting-api,2026-08-09T19:30:00Z,s.petrova,low,no,Replace the retry helper with a shared library implementation.
+notify-5.6.2,notify-service,2026-08-10T13:43:00Z,l.mwangi,low,no,Migrate the config loader to environment variables.
+ledger-1.6.8,ledger-service,2026-08-11T13:44:00Z,l.mwangi,medium,no,Replace the retry helper with a shared library implementation.
+fraud-6.11.2,fraud-scorer,2026-08-12T14:39:00Z,s.petrova,low,no,Split the authorisation handler into smaller functions.
+rate-3.11.4,rate-limiter,2026-08-12T18:17:00Z,d.nakamura,low,no,Raise the connection pool from 10 to 50 after incident review.
+settle-8.10.0,settlement-worker,2026-08-12T19:33:00Z,t.lindqvist,medium,no,Migrate the config loader to environment variables.
+report-8.7.1,reporting-api,2026-08-13T19:43:00Z,t.lindqvist,low,no,Raise the connection pool from 10 to 50 after incident review.
+webhoo-9.1.8,webhook-dispatcher,2026-08-14T10:57:00Z,d.nakamura,low,no,Correct the timezone handling in the settlement cut-off calculation.
+mercha-6.10.1,merchant-portal,2026-08-14T11:32:00Z,e.sorensen,low,no,Bump base image to the January security patch level.
+fraud-9.9.6,fraud-scorer,2026-08-15T07:48:00Z,l.mwangi,low,no,Replace the retry helper with a shared library implementation.
+rate-6.10.3,rate-limiter,2026-08-15T08:38:00Z,r.achterberg,low,no,Cache acquirer routing rules for 60 seconds.
+webhoo-8.0.5,webhook-dispatcher,2026-08-15T17:18:00Z,a.kovacs,low,no,Add structured request logging behind a feature flag.
+checko-9.3.4,checkout-api,2026-08-15T19:38:00Z,m.oyelaran,low,no,"Add a database index on (merchant_id, created_at)."
+ledger-9.7.8,ledger-service,2026-08-16T13:47:00Z,m.oyelaran,low,no,Upgrade the Postgres driver to 3.2.1.
+kyc-9.1.3,kyc-service,2026-08-17T07:40:00Z,n.haddad,low,no,Reduce container memory request from 1Gi to 768Mi.
+featur-6.0.9,feature-store,2026-08-17T10:20:00Z,m.oyelaran,low,no,Upgrade the Postgres driver to 3.2.1.
+settle-3.8.1,settlement-worker,2026-08-20T10:28:00Z,m.oyelaran,medium,no,Correct the timezone handling in the settlement cut-off calculation.

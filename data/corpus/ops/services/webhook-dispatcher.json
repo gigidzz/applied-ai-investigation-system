@@ -1,0 +1,20 @@
+{
+  "name": "webhook-dispatcher",
+  "team": "Platform",
+  "tier": 2,
+  "summary": "Delivers event webhooks to merchant endpoints with retry and backoff.",
+  "repository": "northwind/webhook-dispatcher",
+  "on_call_rotation": "platform-oncall",
+  "depends_on": [
+    "ledger-service",
+    "settlement-queue"
+  ],
+  "depended_on_by": [],
+  "shared_infrastructure": {
+    "settlement-queue": {
+      "owner_team": "Payments Core",
+      "kind": "message queue"
+    }
+  },
+  "catalogue_version": "2026-01-10"
+}

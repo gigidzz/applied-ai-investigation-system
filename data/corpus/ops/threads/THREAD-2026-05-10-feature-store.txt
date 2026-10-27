@@ -1,0 +1,8 @@
+channel: #risk
+date: 2026-05-10
+thread: THREAD-2026-05-10-feature-store
+------------------------------------------------------------
+[13:31] t.lindqvist: feature-store alert fired and self-resolved in 90 seconds.
+[13:42] e.sorensen: Same thing happened on Tuesday.
+[13:53] r.achterberg: Raising it at the operations meeting.
+[13:04] l.mwangi: Added to the noisy-alert list.

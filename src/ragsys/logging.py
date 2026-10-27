@@ -37,7 +37,19 @@ def setup_logging(level: str | None = None) -> None:
     root.setLevel(level or settings.log_level)
 
     # Third-party libraries are chatty at INFO; we only want their warnings.
-    for noisy in ("httpx", "urllib3", "sentence_transformers", "qdrant_client"):
+    for noisy in (
+        "httpx",
+        "httpx2",
+        "httpcore",
+        "httpcore2",
+        "urllib3",
+        "datasets",
+        "huggingface_hub",
+        "fsspec",
+        "filelock",
+        "sentence_transformers",
+        "qdrant_client",
+    ):
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
     _CONFIGURED = True

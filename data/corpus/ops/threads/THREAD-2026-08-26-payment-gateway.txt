@@ -1,0 +1,8 @@
+channel: #payments-core
+date: 2026-08-26
+thread: THREAD-2026-08-26-payment-gateway
+------------------------------------------------------------
+[16:17] j.barros: Can we raise the pool size on payment-gateway?
+[16:28] a.kovacs: The runbook has a documented minimum, check it before changing.
+[16:39] l.mwangi: Right, 25. Current config is fine then.
+[16:50] e.sorensen: Closing this.

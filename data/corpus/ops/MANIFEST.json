@@ -1,0 +1,21 @@
+{
+  "company": "Northwind Payments",
+  "seed": 20260314,
+  "documents": 86,
+  "by_format": {
+    "csv": 1,
+    "docx": 10,
+    "json": 12,
+    "md": 29,
+    "pdf": 14,
+    "txt": 20
+  },
+  "bytes": 482617,
+  "corpus_fingerprint": "077d03ba69bc575f3f00ea6e0755573e",
+  "planted": {
+    "contradictions": 4,
+    "gaps": 3,
+    "near_duplicates": 2,
+    "multi_hop_scenarios": 1
+  }
+}

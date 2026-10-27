@@ -1,0 +1,8 @@
+channel: #merchant-experience
+date: 2026-04-24
+thread: THREAD-2026-04-24-merchant-portal
+------------------------------------------------------------
+[14:07] r.achterberg: merchant-portal alert fired and self-resolved in 90 seconds.
+[14:18] j.barros: Same thing happened on Tuesday.
+[14:29] s.petrova: Raising it at the operations meeting.
+[14:40] e.sorensen: Added to the noisy-alert list.

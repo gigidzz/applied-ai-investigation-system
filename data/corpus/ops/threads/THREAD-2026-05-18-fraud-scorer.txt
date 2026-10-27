@@ -1,0 +1,8 @@
+channel: #risk
+date: 2026-05-18
+thread: THREAD-2026-05-18-fraud-scorer
+------------------------------------------------------------
+[16:21] d.nakamura: Who owns feature-store these days?
+[16:32] s.petrova: Good question, the catalogue says one thing and I thought it changed.
+[16:43] n.haddad: Check the decision records, I think there was an ADR.
+[16:54] j.barros: Will follow up.

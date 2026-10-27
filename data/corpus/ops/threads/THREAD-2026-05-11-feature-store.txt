@@ -1,0 +1,8 @@
+channel: #risk
+date: 2026-05-11
+thread: THREAD-2026-05-11-feature-store
+------------------------------------------------------------
+[15:24] a.kovacs: Anyone else seeing elevated latency on feature-store?
+[15:35] n.haddad: Checking now.
+[15:46] s.petrova: Dashboard looks normal to me, p99 is 180ms.
+[15:57] j.barros: False alarm, it was my local network.

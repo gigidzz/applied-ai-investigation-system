@@ -45,9 +45,13 @@ class Settings(BaseSettings):
     log_json: bool = False
 
     # ---------- document chunking ----------
-    chunk_strategy: Literal["fixed", "recursive", "structural"] = "recursive"
-    chunk_size: int = Field(default=300, gt=0, description="target chunk length in words")
-    chunk_overlap: int = Field(default=50, ge=0, description="word overlap between chunks")
+    # Defaults chosen from the measured corpus, not convention. The median
+    # record is 78 words and the 95th percentile is 177, so a 300-word chunk
+    # would split 0.5% of records and make chunking a no-op. See
+    # docs/CORPUS_PROFILE.md.
+    chunk_strategy: Literal["fixed", "recursive", "structural"] = "structural"
+    chunk_size: int = Field(default=160, gt=0, description="target chunk length in words")
+    chunk_overlap: int = Field(default=40, ge=0, description="word overlap between chunks")
 
     # ---------- embeddings ----------
     # Changing the model invalidates every stored vector: the corpus must be

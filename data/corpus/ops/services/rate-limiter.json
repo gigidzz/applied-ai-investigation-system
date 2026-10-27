@@ -1,0 +1,21 @@
+{
+  "name": "rate-limiter",
+  "team": "Platform",
+  "tier": 1,
+  "summary": "Token-bucket rate limiting shared by all edge services.",
+  "repository": "northwind/rate-limiter",
+  "on_call_rotation": "platform-oncall",
+  "depends_on": [
+    "redis-cluster"
+  ],
+  "depended_on_by": [
+    "payment-gateway"
+  ],
+  "shared_infrastructure": {
+    "redis-cluster": {
+      "owner_team": "Platform",
+      "kind": "cache"
+    }
+  },
+  "catalogue_version": "2026-01-10"
+}

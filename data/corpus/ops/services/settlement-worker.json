@@ -1,0 +1,20 @@
+{
+  "name": "settlement-worker",
+  "team": "Payments Core",
+  "tier": 2,
+  "summary": "Nightly batch job that settles captured payments with acquirers.",
+  "repository": "northwind/settlement-worker",
+  "on_call_rotation": "payments-core-oncall",
+  "depends_on": [
+    "ledger-service",
+    "settlement-queue"
+  ],
+  "depended_on_by": [],
+  "shared_infrastructure": {
+    "settlement-queue": {
+      "owner_team": "Payments Core",
+      "kind": "message queue"
+    }
+  },
+  "catalogue_version": "2026-01-10"
+}

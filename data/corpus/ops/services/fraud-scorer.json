@@ -1,0 +1,21 @@
+{
+  "name": "fraud-scorer",
+  "team": "Risk",
+  "tier": 1,
+  "summary": "Scores each authorisation attempt for fraud risk within 40ms.",
+  "repository": "northwind/fraud-scorer",
+  "on_call_rotation": "risk-oncall",
+  "depends_on": [
+    "feature-store"
+  ],
+  "depended_on_by": [
+    "payment-gateway"
+  ],
+  "shared_infrastructure": {
+    "feature-store": {
+      "owner_team": "Risk",
+      "kind": "service"
+    }
+  },
+  "catalogue_version": "2026-01-10"
+}

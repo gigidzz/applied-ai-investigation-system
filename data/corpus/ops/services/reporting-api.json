@@ -1,0 +1,21 @@
+{
+  "name": "reporting-api",
+  "team": "Merchant Experience",
+  "tier": 3,
+  "summary": "Aggregated reporting queries over the ledger read replica.",
+  "repository": "northwind/reporting-api",
+  "on_call_rotation": "merchant-exp-oncall",
+  "depends_on": [
+    "postgres-replica"
+  ],
+  "depended_on_by": [
+    "merchant-portal"
+  ],
+  "shared_infrastructure": {
+    "postgres-replica": {
+      "owner_team": "Payments Core",
+      "kind": "database"
+    }
+  },
+  "catalogue_version": "2026-01-10"
+}
