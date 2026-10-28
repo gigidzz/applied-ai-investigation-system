@@ -18,6 +18,23 @@ _FORMAT = "%(asctime)s %(levelname)-8s %(name)-28s %(message)s"
 _DATEFMT = "%H:%M:%S"
 
 
+class DropMessagesContaining(logging.Filter):
+    """Drops individual log records, leaving the rest of a logger intact.
+
+    Preferred over raising a logger's level when only one of its messages is
+    noise. Silencing a whole logger to hide one line also hides the lines you
+    would want, which is a trade worth refusing when a filter costs this little.
+    """
+
+    def __init__(self, *fragments: str) -> None:
+        super().__init__()
+        self.fragments = fragments
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = record.getMessage()
+        return not any(fragment in message for fragment in self.fragments)
+
+
 def setup_logging(level: str | None = None) -> None:
     """Configure root logging. Safe to call repeatedly; only the first call acts.
 
@@ -51,6 +68,20 @@ def setup_logging(level: str | None = None) -> None:
         "qdrant_client",
     ):
         logging.getLogger(noisy).setLevel(logging.WARNING)
+
+    # torch reports on every import that process redirects are unsupported on
+    # macOS. This project never uses torch.distributed, so the notice can
+    # never be relevant and the whole logger is silenced.
+    logging.getLogger("torch.distributed.elastic.multiprocessing.redirects").setLevel(logging.ERROR)
+
+    # The Hub advises setting a token for faster downloads, on every run, for
+    # a model that is already cached. Dropped by message rather than by
+    # silencing the logger: the same logger also reports download retries and
+    # rate limiting, which are exactly what a deployment that cannot fetch
+    # the model would need to say.
+    logging.getLogger("huggingface_hub.utils._http").addFilter(
+        DropMessagesContaining("unauthenticated requests")
+    )
 
     _CONFIGURED = True
 

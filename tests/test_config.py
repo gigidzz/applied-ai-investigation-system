@@ -81,3 +81,18 @@ def test_require_returns_the_value_when_set(monkeypatch: pytest.MonkeyPatch) -> 
 
     monkeypatch.setattr(ragsys.config.settings, "qdrant_url", "http://localhost:6333")
     assert require("qdrant_url") == "http://localhost:6333"
+
+
+def test_only_the_named_message_is_dropped():
+    """Silencing a whole logger to hide one line also hides the useful ones."""
+    import logging
+
+    from ragsys.logging import DropMessagesContaining
+
+    drop = DropMessagesContaining("unauthenticated requests")
+
+    def record(message: str) -> logging.LogRecord:
+        return logging.LogRecord("x", logging.WARNING, "f", 1, message, None, None)
+
+    assert not drop.filter(record("You are sending unauthenticated requests to the Hub"))
+    assert drop.filter(record("Retrying download after a 429 from the Hub"))

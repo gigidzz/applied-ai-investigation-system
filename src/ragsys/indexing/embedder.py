@@ -11,6 +11,7 @@ the vector store from dividing by magnitudes on every comparison.
 
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING
 
 from ragsys.config import settings
@@ -25,6 +26,19 @@ log = get_logger(__name__)
 # passages carry none. Applying the prefix to both, or to neither, measurably
 # degrades retrieval, and does so silently.
 QUERY_PREFIX = "Represent this sentence for searching relevant passages: "
+
+
+def _quiet_download_progress() -> None:
+    """Suppress the model-loading progress bars before the libraries load.
+
+    They write to stderr on every run and cannot be turned off afterwards,
+    because the setting is read at import. Harmless locally, but they would
+    interleave with real output in a deployment log and make a demo look
+    unfinished. Set explicitly rather than overwritten, so an operator who
+    wants the bars back can export the variable themselves.
+    """
+    for name in ("HF_HUB_DISABLE_PROGRESS_BARS", "TRANSFORMERS_NO_ADVISORY_WARNINGS"):
+        os.environ.setdefault(name, "1")
 
 
 class DimensionMismatch(RuntimeError):
@@ -53,6 +67,7 @@ class Embedder:
     @property
     def model(self) -> SentenceTransformer:
         if self._model is None:
+            _quiet_download_progress()
             from sentence_transformers import SentenceTransformer
 
             log.info("loading embedding model %s", self.model_name)
