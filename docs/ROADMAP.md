@@ -13,8 +13,8 @@ when it was written.
 |---|---|---|---|
 | 0 | Foundations | Importable package, locked dependencies, validated configuration, secrets kept out of version control, test harness | done |
 | 1 | Corpus | Acquire and normalise the document set; build the labelled evaluation question set; profile the data before designing against it | done |
-| 2 | Ingestion | Per-format loaders, metadata extraction, two comparable chunking strategies, duplicate detection, add/update/delete | next |
-| 3 | Indexing | Embedding model, vector store schema with dense and sparse vectors, idempotent batch upsert | |
+| 2 | Ingestion | Per-format loaders, metadata extraction, two comparable chunking strategies, duplicate detection, add/update/delete | done |
+| 3 | Indexing | Embedding model, vector store schema with dense and sparse vectors, idempotent batch upsert | next |
 | 4 | Retrieval | Semantic search, keyword search, custom fusion and ranking, optional cross-encoder rerank | |
 | 5 | Reasoning | Query decomposition, tool calling, multi-source synthesis, inline citations, contradiction detection, abstention | |
 | 6 | Evaluation | Automated harness over 40+ questions; Recall@K, MRR, answer correctness, citation accuracy, abstention precision; configuration comparison | |
@@ -83,6 +83,58 @@ From `docs/CORPUS_PROFILE.md`, regenerable with
 - ISO dates appear in **97.9%** of operations records but **0.6%** of the
   corpus overall. Date filtering must boost, never exclude, or a query
   mentioning a month would discard all 66,581 Wikipedia paragraphs.
+
+## Ingestion
+
+`src/ragsys/ingestion/` turns every supported file into uniform chunks. One
+entry point, `ingest_file`, serves both the offline bulk build and the
+single-document upload in the interface, so uploaded documents cannot be
+processed differently from pre-loaded ones.
+
+Seven loaders — pdf, docx, csv, md, json, jsonl, txt. Two of them do not map
+one file to one document: a CSV yields one document per row, because each
+deploy is independently citable, and a PDF yields one per page, so a citation
+can name the page. An unreadable file is logged and skipped rather than
+aborting a pass over 67,000 records.
+
+Metadata extraction recovers the fields citations need — date, author,
+severity, service, referenced incidents and releases — using generic patterns
+rather than knowledge of this corpus. A document's own date is taken only from
+its first 400 characters: a date deeper in the body is almost always a
+reference to something else, and treating it as the document's date would
+wrongly boost a runbook for every query about March.
+
+Four document states drive add/update/delete. NEW and CHANGED are stored,
+CHANGED first removing the previous version's chunks so the system cannot cite
+text that no longer exists. UNCHANGED is skipped, which avoids re-running the
+most expensive step in the pipeline. DUPLICATE is skipped with a record of
+which document owns the text — the case identity-by-name cannot catch, and
+content hashing found 26 of them that Stage 1's title-based deduplication
+had missed.
+
+### Measured results
+
+From one run over the full corpus, 5.8 seconds, no failures:
+
+| | structural | fixed |
+|---|---|---|
+| chunks | 72,294 | 72,441 |
+| chunks per document | 1.08 | 1.08 |
+| documents split | 4,961 (7.4%) | 4,961 (7.4%) |
+| total words | 5,817,555 | 6,037,313 |
+| median chunk | 76 words | 77 words |
+| 95th percentile | 150 words | 160 words |
+
+The 7.4% figure is exactly what profiling predicted for a 160-word limit,
+which is the measurement that set the default. The strategies differ in two
+visible ways: `fixed` holds 219,758 more words, because neighbouring windows
+repeat 40 words of each other, and its chunks cluster at exactly 160 words
+while `structural` chunks stop at whatever sentence or block boundary falls
+below the limit.
+
+Both preserve every content word of every document — asserted over the whole
+committed operations corpus in `tests/test_chunking.py`, which caught two
+heading-loss bugs during development.
 
 ## Design decisions already fixed
 
