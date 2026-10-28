@@ -16,8 +16,8 @@ when it was written.
 | 2 | Ingestion | Per-format loaders, metadata extraction, two comparable chunking strategies, duplicate detection, add/update/delete | done |
 | 3 | Indexing | Embedding model, vector store schema with dense and sparse vectors, idempotent batch upsert | done |
 | 4 | Retrieval | Semantic search, keyword search, custom fusion and ranking, optional cross-encoder rerank | done |
-| 5 | Reasoning | Query decomposition, tool calling, multi-source synthesis, inline citations, contradiction detection, abstention | next |
-| 6 | Evaluation | Automated harness over 40+ questions; Recall@K, MRR, answer correctness, citation accuracy, abstention precision; configuration comparison | |
+| 5 | Reasoning | Query decomposition, tool calling, multi-source synthesis, inline citations, contradiction detection, abstention | done |
+| 6 | Evaluation | Automated harness over 40+ questions; Recall@K, MRR, answer correctness, citation accuracy, abstention precision; configuration comparison | next |
 | 7 | Interface | HTTP API and web UI for document management, querying and source inspection | |
 | 8 | Hardening | Test coverage, retry and timeout behaviour, caching, token and cost accounting, observability | |
 | 9 | Deployment | Public URL on free-tier hosting, persistent vector storage, protected secrets | |
@@ -405,6 +405,107 @@ questions written for this corpus would be marking our own homework, and the
 figures above would stop meaning anything. They are tuned at stage 6 against
 HotpotQA's external labels, and whatever those weights turn out to be is what
 these operations numbers get reported at.
+
+## Reasoning
+
+`src/ragsys/reasoning/` turns retrieved chunks into a cited answer. One rule
+governs everything: the model may use only the text it is given. That is what
+makes citations checkable, abstention meaningful, and contradiction reporting
+possible at all — a model answering from its own parameters cannot distinguish
+knowing from guessing.
+
+**The client is standard-library HTTP, not a vendor SDK.** The deployed image
+stays small, there is no second dependency to pin against a free-tier host,
+and tool calling is a handful of JSON fields rather than a framework. This
+interpreter cannot complete a TLS handshake without `truststore`, because the
+python.org build ships no certificate bundle on macOS, so the client installs
+it lazily before its first request.
+
+**Citations are validated in code, never trusted.** Every `[Sn]` in the answer
+is matched against the labels actually supplied, and anything left over is
+recorded in `invalid_labels` rather than dropped. A model citing `S18` when
+fifteen sources were given is a verifiable fault, not a question of quality,
+so it is not sent to a judge. The model's own list of claimed labels is
+checked too: a label listed but never written still asserts that a source was
+relevant.
+
+**Structured output is carried in the prompt, with the provider's schema as a
+fallback.** Gemini cannot combine strict JSON output with tool calling in one
+request, and tool calling is a requirement, so the output contract lives in
+the system prompt and is parsed here. A reply that will not parse triggers one
+retry with the provider's own schema and no tools. That path fired on a real
+question during development, so it is exercised rather than theoretical.
+
+**Tool calling is one tool: `search_documents`.** It earns its place because
+the second query of a multi-part question is only knowable after reading the
+answer to the first. Labels are handed out by a register that keeps them
+stable across rounds, since a chunk the model saw as `S4` must still be `S4`
+after a tool call appends more, or the citations it writes point at the wrong
+documents.
+
+**A model outage is a result, not an exception.** `Agent.answer` returns an
+`Answer` carrying the error and an abstention, so one HTTP failure cannot
+abort a run over the whole question set.
+
+### Model fallback
+
+The client tries several models in order. Both reasons were observed against
+this key within one minute: `gemini-2.5-flash` answered 404 with a message
+naming its replacement, and `gemini-3.8-flash` answered 503 "experiencing high
+demand" however long the backoff. Of seven flash models probed, three were
+unusable and four answered immediately. Failing a question while an equivalent
+model sits idle is not acceptable behaviour on a free tier, so 404 and 503
+advance to the next candidate while 400 and 403 — our own mistakes — abort.
+
+### Measured behaviour
+
+Three real questions against the live index and a live model.
+
+**The planted contradiction**, `when did the rollback of pay-gw-4.2.1 finish`:
+
+```
+According to the incident report timeline, the rollback was complete at 15:10
+[S1], with the incident marked resolved at 15:10 UTC [S5]. However, the
+incident chat thread records r.achterberg stating at 15:40 that the rollback
+finished on all pods [S8].
+
+CONTRADICTIONS: S1 states 15:10, while S8 states 15:40  ['S1', 'S8']
+grounded=True  confidence=low  sources=15  tool_calls=0
+```
+
+Both times reported, each attributed, neither chosen. `confidence` is `low`
+because the evidence conflicts, which is the correct self-assessment.
+
+**A deliberate gap**, `what does the kyc-service runbook say about escalation`
+— the corpus has 18 runbooks and deliberately none for kyc-service:
+
+```
+ABSTAINED: The provided documents do not contain the runbook or escalation
+           instructions for kyc-service.
+grounded=True  confidence=high  sources=21  tool_calls=2
+```
+
+Note `tool_calls=2` and `sources=21`. The model searched twice, listed the
+runbooks it did find, and only then abstained. That is the multi-step
+requirement and the abstention requirement satisfied by the same trace.
+
+**Cross-document synthesis**, the brief's own example question:
+
+```
+The March disruption (INC-2026-03-14) was caused by release pay-gw-4.2.1
+deployed to payment-gateway, which reduced the per-pod database connection
+pool from 50 to 10 [S2][S5]. The affected services were payment-gateway,
+checkout-api, and merchant-portal [S2].
+
+grounded=True  confidence=high  sources=15
+```
+
+Correct on all three parts. Worth recording that it cited the incident report
+and the monthly operations report, while the answer key names the change log,
+the incident report and the service catalogue. The answer is right and the
+documents cited are not the documents expected, which is exactly why stage 6
+must score retrieval and answer correctness separately rather than assuming
+one implies the other.
 
 ## Design decisions already fixed
 
