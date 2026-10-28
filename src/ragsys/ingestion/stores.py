@@ -27,6 +27,16 @@ class ChunkStore(Protocol):
         """Remove every chunk belonging to a document. Returns how many."""
         ...
 
+    def delete_source(self, source_path: str) -> int:
+        """Remove every chunk of a source file, across all its documents.
+
+        Distinct from delete_document because one file can produce many
+        documents: a three-page PDF yields three ids. Replacing an uploaded
+        file needs the file-level operation, or the previous version's extra
+        pages survive as chunks nothing will ever update.
+        """
+        ...
+
     def count(self) -> int: ...
 
 
@@ -58,6 +68,14 @@ class InMemoryChunkStore:
     def delete_document(self, doc_id: str) -> int:
         removed = self._by_doc.pop(doc_id, [])
         return len(removed)
+
+    def delete_source(self, source_path: str) -> int:
+        doomed = [
+            doc_id
+            for doc_id, chunks in self._by_doc.items()
+            if any(c.metadata.get("source_path") == source_path for c in chunks)
+        ]
+        return sum(self.delete_document(doc_id) for doc_id in doomed)
 
     def count(self) -> int:
         return sum(len(v) for v in self._by_doc.values())
@@ -97,6 +115,11 @@ class JsonlChunkStore:
         raise NotImplementedError(
             "JsonlChunkStore is append-only; deletion needs an indexed store. "
             "Use InMemoryChunkStore for update and delete, or the vector store."
+        )
+
+    def delete_source(self, source_path: str) -> int:
+        raise NotImplementedError(
+            "JsonlChunkStore is append-only; deletion needs an indexed store."
         )
 
     def count(self) -> int:

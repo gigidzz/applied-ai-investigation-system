@@ -1,0 +1,119 @@
+:root {
+  --bg: #11141a;
+  --panel: #181c25;
+  --line: #262c3a;
+  --text: #e6e9ef;
+  --dim: #98a2b8;
+  --accent: #6ea8ff;
+  --good: #57c98b;
+  --warn: #e0b341;
+  --bad: #e8697d;
+  --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+header { padding: 28px 24px 18px; border-bottom: 1px solid var(--line); }
+h1 { margin: 0 0 6px; font-size: 21px; letter-spacing: -0.01em; }
+h2 { margin: 0 0 14px; font-size: 15px; text-transform: uppercase;
+     letter-spacing: 0.08em; color: var(--dim); }
+h3 { margin: 22px 0 8px; font-size: 14px; color: var(--dim); font-weight: 600; }
+.sub { margin: 0; max-width: 70ch; color: var(--dim); font-size: 13.5px; }
+.hint { color: var(--dim); font-weight: 400; font-size: 12.5px; }
+
+main { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+       gap: 20px; padding: 20px 24px 60px; align-items: start; }
+@media (max-width: 1000px) { main { grid-template-columns: 1fr; } }
+
+section { background: var(--panel); border: 1px solid var(--line);
+          border-radius: 10px; padding: 18px; }
+
+.health { margin-top: 12px; font-family: var(--mono); font-size: 12px; color: var(--dim); }
+.health.ok { color: var(--good); }
+.health.bad { color: var(--bad); }
+
+textarea, input[type=file] {
+  width: 100%; background: #0e1117; color: var(--text);
+  border: 1px solid var(--line); border-radius: 7px; padding: 10px;
+  font: inherit; resize: vertical;
+}
+textarea:focus, input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+button {
+  margin-top: 10px; background: var(--accent); color: #0b1020; border: 0;
+  border-radius: 7px; padding: 9px 16px; font: 600 14px inherit; cursor: pointer;
+}
+button:disabled { opacity: 0.55; cursor: progress; }
+.examples { margin-top: 14px; font-size: 12.5px; color: var(--dim); }
+.examples button.example {
+  display: block; margin: 6px 0 0; background: transparent; color: var(--accent);
+  border: 1px solid var(--line); padding: 6px 9px; font-weight: 400;
+  font-size: 12.5px; text-align: left; width: 100%;
+}
+
+#answer-text { margin: 10px 0 4px; white-space: pre-wrap; }
+.flag { display: inline-block; margin: 0 6px 8px 0; padding: 3px 9px;
+        border-radius: 999px; font-size: 12px; font-weight: 600; }
+.flag.abstained { background: rgba(224,179,65,0.16); color: var(--warn); }
+.flag.grounded  { background: rgba(87,201,139,0.16); color: var(--good); }
+.flag.ungrounded{ background: rgba(232,105,125,0.16); color: var(--bad); }
+.flag.conflict  { background: rgba(110,168,255,0.16); color: var(--accent); }
+
+cite.ref { font-style: normal; font-family: var(--mono); font-size: 12px;
+  color: var(--accent); background: rgba(110,168,255,0.12); border: 0;
+  border-radius: 4px; padding: 1px 5px; cursor: pointer; }
+cite.ref:hover { background: rgba(110,168,255,0.3); }
+cite.ref.missing { color: var(--bad); background: rgba(232,105,125,0.14); }
+
+#contradictions .conflict-box {
+  margin: 12px 0; padding: 10px 12px; border-left: 3px solid var(--accent);
+  background: rgba(110,168,255,0.07); font-size: 13.5px;
+}
+dl#meta { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px;
+          margin: 14px 0 0; font-family: var(--mono); font-size: 12px; color: var(--dim); }
+dl#meta dt { color: #6f7a90; }
+dl#meta dd { margin: 0; }
+
+ol#sources { list-style: none; margin: 0; padding: 0; }
+ol#sources li { border: 1px solid var(--line); border-radius: 8px;
+  padding: 10px 12px; margin-bottom: 8px; background: #0e1117; }
+ol#sources li.cited { border-color: rgba(110,168,255,0.5); }
+ol#sources li.flash { outline: 2px solid var(--accent); }
+.src-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap;
+            font-family: var(--mono); font-size: 12px; }
+.src-label { color: var(--accent); font-weight: 700; }
+.src-path { color: var(--text); word-break: break-all; }
+.src-facts { color: var(--dim); }
+.src-text { margin-top: 6px; font-size: 13px; color: #c6ccda; }
+
+  font-size: 13px; table-layout: auto; }
+  font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--line); padding: 6px 8px 6px 0; }
+  vertical-align: top; }
+button.delete { margin: 0; background: transparent; color: var(--bad);
+  border: 1px solid #3a2730; padding: 3px 7px; font-size: 11.5px; font-weight: 500;
+  white-space: nowrap; }
+#upload-result, #documents-summary { margin-top: 10px; font-size: 12.5px; }
+.error { color: var(--bad); }
+.ok { color: var(--good); }
+
+#sources-wrap { margin-top: 22px; }
+#sources-wrap > summary { cursor: pointer; font-size: 14px; color: var(--dim);
+  font-weight: 600; margin-bottom: 8px; }
+#sources-wrap > summary::marker { color: var(--dim); }
+
+.note { margin: 10px 0 0; max-width: 60ch; }
+
+/* The document column holds paths, which have no spaces to wrap at. Breaking
+   anywhere is ugly but an overflowing table is worse, and the full path is
+   available on hover. */
+/* Five columns, and the widths must sum to 100% or the last one is pushed
+   out of the panel. */
+ul#documents { list-style: none; margin: 14px 0 0; padding: 0; }
+ul#documents li { padding: 9px 0; border-bottom: 1px solid #1f2430; }
+ul#documents li.error { color: var(--bad); }
+.doc-path { font-size: 13px; overflow-wrap: anywhere; }
+.doc-row { display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; margin-top: 3px; }
+.doc-facts { font-family: var(--mono); font-size: 11.5px; color: var(--dim); }

@@ -28,6 +28,10 @@ log = get_logger(__name__)
 DENSE = "dense"
 SPARSE = "sparse"
 
+# Document-level fields worth surfacing in a listing, and the payload key each
+# comes from. Filled from whichever chunk happens to carry them.
+_FILLABLE = (("date", "meta_date"), ("service", "meta_service"), ("title", "meta_title"))
+
 # Qdrant serves HTTP on 6333. The cloud console sometimes hands out a URL
 # without the port, and a missing port surfaces much later as an opaque
 # connection error, so it is filled in here instead.
@@ -56,6 +60,25 @@ def normalise_url(url: str) -> str:
     if parsed.port is None:
         parsed = parsed._replace(netloc=f"{parsed.hostname}:{DEFAULT_PORT}")
     return urlunparse(parsed)
+
+
+@dataclass(frozen=True)
+class DocumentSummary:
+    """One source file as the interface presents it.
+
+    Grouped by source path rather than by document id, because a user thinks
+    in files while the index thinks in documents: a three-page PDF is three
+    documents with ids ending `#page=1`, `#page=2`, `#page=3`, and offering
+    three rows to delete separately would be confusing and error-prone.
+    """
+
+    source_path: str
+    fmt: str
+    chunk_count: int
+    doc_ids: tuple[str, ...]
+    date: str | None = None
+    service: str | None = None
+    title: str | None = None
 
 
 @dataclass(frozen=True)
@@ -136,7 +159,7 @@ class QdrantChunkStore:
         # in-process instance ignores payload indexes, so asking for one there
         # only produces a warning.
         if not self._in_memory:
-            for field in ("doc_id", "strategy"):
+            for field in ("doc_id", "strategy", "meta_format", "meta_source_path"):
                 self.client.create_payload_index(
                     collection_name=self.collection,
                     field_name=field,
@@ -203,6 +226,134 @@ class QdrantChunkStore:
 
     def count(self) -> int:
         return self.client.count(collection_name=self.collection, exact=True).count
+
+    def ensure_payload_indexes(self) -> list[str]:
+        """Add any missing payload indexes to an existing collection.
+
+        Needed because the collection was created before document listing
+        existed, and filtering an unindexed payload field forces a scan of
+        every point. Creating an index that already exists is harmless, so
+        this is safe to call on every startup.
+        """
+        if self._in_memory:
+            return []
+        created = []
+        for field in ("doc_id", "strategy", "meta_format", "meta_source_path"):
+            try:
+                self.client.create_payload_index(
+                    collection_name=self.collection, field_name=field, field_schema="keyword"
+                )
+                created.append(field)
+            except Exception as exc:  # already present, which is the common case
+                log.debug("payload index %s not created: %s", field, exc)
+        return created
+
+    def list_documents(
+        self,
+        limit: int = 500,
+        exclude_formats: tuple[str, ...] = ("jsonl",),
+    ) -> list[DocumentSummary]:
+        """Source files in the index, newest first, excluding bulk corpora.
+
+        `jsonl` is excluded by default because that format holds the 66,581
+        Wikipedia paragraphs: they arrived as one bulk dataset, are not
+        individually manageable, and listing them would bury the documents a
+        user can actually act on. Only a few hundred points match once they
+        are filtered out, so grouping client-side costs one or two round trips
+        rather than a scan of the whole collection.
+        """
+        from qdrant_client import models
+
+        condition = None
+        if exclude_formats:
+            condition = models.Filter(
+                must_not=[
+                    models.FieldCondition(key="meta_format", match=models.MatchValue(value=fmt))
+                    for fmt in exclude_formats
+                ]
+            )
+
+        by_source: dict[str, dict[str, Any]] = {}
+        offset = None
+        while True:
+            points, offset = self.client.scroll(
+                collection_name=self.collection,
+                scroll_filter=condition,
+                limit=256,
+                offset=offset,
+                with_payload=True,
+                with_vectors=False,
+            )
+            for point in points:
+                payload = point.payload or {}
+                source = str(payload.get("meta_source_path") or payload.get("doc_id") or "")
+                if not source:
+                    continue
+                entry = by_source.setdefault(
+                    source,
+                    {
+                        "fmt": str(payload.get("meta_format", "")),
+                        "chunks": 0,
+                        "doc_ids": set(),
+                        "date": payload.get("meta_date"),
+                        "service": payload.get("meta_service"),
+                        "title": payload.get("meta_title"),
+                    },
+                )
+                entry["chunks"] += 1
+                entry["doc_ids"].add(str(payload.get("doc_id", "")))
+                # The first chunk of a document often lacks a date while a
+                # later one carries it, so fill gaps as they appear.
+                for key, meta in _FILLABLE:
+                    if entry[key] is None and payload.get(meta) is not None:
+                        entry[key] = payload[meta]
+            if offset is None or len(by_source) >= limit:
+                break
+
+        summaries = [
+            DocumentSummary(
+                source_path=source,
+                fmt=entry["fmt"],
+                chunk_count=entry["chunks"],
+                doc_ids=tuple(sorted(d for d in entry["doc_ids"] if d)),
+                date=entry["date"],
+                service=entry["service"],
+                title=entry["title"],
+            )
+            for source, entry in by_source.items()
+        ]
+        # Dated documents first and newest first, because a reader scanning
+        # an operations corpus wants recent incidents at the top. Undated
+        # documents follow in path order, which is at least predictable.
+        dated = sorted((d for d in summaries if d.date), key=lambda d: str(d.date), reverse=True)
+        undated = sorted((d for d in summaries if not d.date), key=lambda d: d.source_path)
+        return (dated + undated)[:limit]
+
+    def delete_source(self, source_path: str) -> int:
+        """Remove every chunk of a source file, across all its documents.
+
+        The file-level counterpart to delete_document: deleting a three-page
+        PDF should not require three calls.
+        """
+        from qdrant_client import models
+
+        condition = models.Filter(
+            must=[
+                models.FieldCondition(
+                    key="meta_source_path", match=models.MatchValue(value=source_path)
+                )
+            ]
+        )
+        present = self.client.count(
+            collection_name=self.collection, count_filter=condition, exact=True
+        ).count
+        if present:
+            self.client.delete(
+                collection_name=self.collection,
+                points_selector=models.FilterSelector(filter=condition),
+                wait=True,
+            )
+        return present
 
     # ---------- retrieval ----------
 

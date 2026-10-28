@@ -23,9 +23,11 @@ from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from ragsys.config import settings
 from ragsys.ingestion.chunking import STRATEGIES, chunk_document
 from ragsys.ingestion.dedupe import ContentIndex, DocumentState
 from ragsys.ingestion.loaders import SUPPORTED_SUFFIXES, UnsupportedFormatError, load_any
+from ragsys.ingestion.loaders._paths import citation_path
 from ragsys.ingestion.metadata import enrich
 from ragsys.ingestion.models import RawDocument
 from ragsys.ingestion.stores import ChunkStore
@@ -140,6 +142,90 @@ def ingest_file(
     """
     documents = [enrich(doc) for doc in load_any(path)]
     return [ingest_raw_document(doc, store, index, strategies, summary) for doc in documents]
+
+
+# Uploads live under the corpus root so their ids read like every other
+# document's — "uploads/report.pdf" rather than an absolute temp path that
+# would differ on every machine and be meaningless in a citation.
+UPLOAD_DIRNAME = "uploads"
+
+
+class UnsupportedUpload(ValueError):
+    """The uploaded file has no loader."""
+
+
+def upload_dir() -> Path:
+    return settings.corpus_dir / UPLOAD_DIRNAME
+
+
+def ingest_upload(
+    filename: str,
+    data: bytes,
+    store: ChunkStore,
+    index: ContentIndex,
+    strategies: Sequence[str] | None = None,
+) -> list[IngestResult]:
+    """Ingest a file supplied as bytes, as an upload is.
+
+    Lives here rather than in the web layer because it is an ingestion
+    concern: a command-line importer would want exactly this. Keeping it in
+    the domain also means it is tested without starting a server.
+
+    Re-uploading the same filename is an update, not a duplicate: the
+    document id is derived from the path, so change detection sees the same
+    id with new content and replaces the previous version's chunks. That is
+    the intended behaviour and the reason uploads are not given unique names.
+
+    Chunked with one strategy, not both. The offline build writes every
+    strategy so that stage 6 can compare them, but a live index is built with
+    exactly one and its BM25 statistics are computed over that one. Writing
+    both here would store each uploaded passage twice under two chunkings, so
+    an uploaded document would occupy twice the result slots of a document
+    that arrived in the bulk build, and retrieval would surface two near
+    duplicates of the same text.
+    """
+    strategies = strategies or (settings.chunk_strategy,)
+    # Only the final component is used. A browser can send a name containing
+    # path separators, and joining that to a directory would write outside it.
+    safe_name = Path(filename).name
+    if not safe_name:
+        raise UnsupportedUpload("the upload has no filename")
+
+    suffix = Path(safe_name).suffix.lower()
+    if suffix not in SUPPORTED_SUFFIXES:
+        raise UnsupportedUpload(
+            f"{suffix or 'no extension'} is not supported; "
+            f"expected one of {', '.join(sorted(SUPPORTED_SUFFIXES))}"
+        )
+
+    target = upload_dir() / safe_name
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(data)
+
+    # Replace rather than add. Change detection alone is not enough here: if
+    # the new version of a PDF has fewer pages than the old one, the extra
+    # pages' chunks belong to document ids the new file no longer produces,
+    # so nothing would ever update or remove them and the system would keep
+    # citing pages that no longer exist.
+    #
+    # The order matters and an earlier version got it wrong. Deleting the
+    # chunks and then calling the normal pipeline lost the document outright
+    # when the file was re-uploaded unchanged: change detection compared the
+    # content against what it had already recorded, concluded UNCHANGED, and
+    # skipped the write that would have restored what the delete removed. So
+    # the previous state is discarded first, which makes every document in
+    # the upload NEW and guarantees the write happens.
+    documents = [enrich(doc) for doc in load_any(target)]
+    for document in documents:
+        index.forget(document.doc_id)
+
+    citation = citation_path(target)
+    removed = store.delete_source(citation)
+    if removed:
+        log.info("replacing %s: removed %d chunks of the previous version", citation, removed)
+
+    log.info("ingesting upload %s (%d bytes, %d documents)", safe_name, len(data), len(documents))
+    return [ingest_raw_document(doc, store, index, strategies) for doc in documents]
 
 
 def delete_document(doc_id: str, store: ChunkStore, index: ContentIndex) -> int:

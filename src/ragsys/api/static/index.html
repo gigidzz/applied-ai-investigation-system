@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Document investigation system</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>Document investigation system</h1>
+  <p class="sub">Hybrid retrieval over a mixed-format corpus. Every claim is cited; the
+     system abstains when the documents do not answer, and reports disagreement
+     rather than choosing a side.</p>
+  <div id="health" class="health">checking the index&hellip;</div>
+</header>
+
+<main>
+  <section id="ask-panel">
+    <h2>Ask</h2>
+    <form id="ask-form">
+      <textarea id="question" rows="2" required minlength="3"
+        placeholder="When did the rollback of pay-gw-4.2.1 finish?"></textarea>
+      <span class="hint">Enter to ask, Shift+Enter for a new line</span>
+      <button type="submit" id="ask-button">Ask</button>
+    </form>
+    <div class="examples">
+      Try:
+      <button type="button" class="example">When did the rollback of pay-gw-4.2.1 finish?</button>
+      <button type="button" class="example">Which team owns the settlement queue?</button>
+      <button type="button" class="example">What is the alert escalation procedure for kyc-service?</button>
+      <button type="button" class="example">Which system change caused the March payment disruption, and which services were affected?</button>
+    </div>
+
+    <div id="answer" hidden>
+      <div id="flags"></div>
+      <div id="answer-text"></div>
+      <div id="contradictions"></div>
+      <dl id="meta"></dl>
+      <details id="sources-wrap" open>
+        <summary id="sources-summary">Sources</summary>
+        <ol id="sources"></ol>
+      </details>
+    </div>
+  </section>
+
+  <section id="documents-panel">
+    <h2>Documents</h2>
+    <form id="upload-form">
+      <label for="file">Add a document
+        <span class="hint">pdf, docx, csv, md, json, jsonl or txt</span></label>
+      <input type="file" id="file" name="file" required
+             accept=".pdf,.docx,.csv,.md,.markdown,.json,.jsonl,.txt">
+      <button type="submit" id="upload-button">Upload and index</button>
+    </form>
+    <div id="upload-result"></div>
+    <div id="documents-summary" class="hint"></div>
+    <p class="hint note">Each document is split into passages so it can be searched.
+       Deleting removes the whole document and every passage of it.</p>
+    <ul id="documents"></ul>
+  </section>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

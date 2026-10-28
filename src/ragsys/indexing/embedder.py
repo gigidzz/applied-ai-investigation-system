@@ -92,6 +92,17 @@ class Embedder:
     def dim(self) -> int:
         return self.expected_dim
 
+    @property
+    def is_loaded(self) -> bool:
+        """Whether the weights are in memory yet.
+
+        Exposed so a health check can report readiness without triggering the
+        load it is asking about: touching `.model` would block for about
+        twenty-five seconds, which is long enough for a platform health probe
+        to decide the container is dead and restart it.
+        """
+        return self._model is not None
+
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
         """Encode passages for storage. No instruction prefix."""
         if not texts:

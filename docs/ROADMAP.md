@@ -18,9 +18,9 @@ when it was written.
 | 4 | Retrieval | Semantic search, keyword search, custom fusion and ranking, optional cross-encoder rerank | done |
 | 5 | Reasoning | Query decomposition, tool calling, multi-source synthesis, inline citations, contradiction detection, abstention | done |
 | 6 | Evaluation | Automated harness over 40+ questions; Recall@K, MRR, answer correctness, citation accuracy, abstention precision; configuration comparison | done |
-| 7 | Interface | HTTP API and web UI for document management, querying and source inspection | next |
+| 7 | Interface | HTTP API and web UI for document management, querying and source inspection | done |
 | 8 | Hardening | Test coverage, retry and timeout behaviour, caching, token and cost accounting, observability | mostly absorbed |
-| 9 | Deployment | Public URL on free-tier hosting, persistent vector storage, protected secrets | |
+| 9 | Deployment | Public URL on free-tier hosting, persistent vector storage, protected secrets | next |
 | 10 | Documentation | Architecture write-up, evaluation report, AI usage report | |
 
 ## Dependency order
@@ -748,15 +748,25 @@ property, or by two measurements disagreeing with each other.
 | 16 | 429 did not trigger the model fallback, so a question failed while a working model sat one line below in the list | asking a question by hand after the quota ran out | 429 moves on immediately, and exhausted models are remembered |
 | 17 | The answer never recorded which model produced it, so a fallback was invisible | reading the output of a question answered by a fallback | `Answer.model`, reported when it differs from the model requested |
 | 18 | `--progress` was defined but never passed to the harness, so a run could not resume | the progress file did not exist after a run | wire it through, and assert it by parsing the call site |
+| 19 | Re-uploading an unchanged file **deleted it from the index**: replacing removes the file's chunks first, then change detection reported UNCHANGED and skipped the write that would have restored them | uploading the same file twice through the running API | discard the previous state before ingesting, so every document in an upload is NEW and the write always happens |
+| 20 | An upload wrote **both** chunking strategies into a live index built with one, so each uploaded passage was stored twice under two chunkings and an uploaded document occupied twice the result slots of a bulk-loaded one | walking through what one uploaded file became in the database, and finding two rows both numbered `chunk 0` | uploads use `settings.chunk_strategy` alone; writing every strategy is correct only for the offline build that stage 6 compares |
 
 Two patterns are worth naming.
+
+Defects 19 and 20 were both found by running the system and looking at
+what it had actually stored, rather than by any test. Defect 19 is the
+exception that proves the point about coverage: the API
+had a test for re-uploading a file, but it re-uploaded *different* content
+and so exercised the CHANGED path while the destructive case was UNCHANGED.
+The test that mattered was the one nobody thought to write, and it took
+running the real thing to find it.
 
 **Most of these were found by a property test or a contradiction between two
 numbers, not by review.** Defects 6, 10 and 12 were caught by assertions;
 defects 8, 13 and 14 were caught because two measurements disagreed. That is
 the argument for measuring the same thing two ways wherever it is cheap.
 
-**Three of the eighteen are the same mistake**: an identifier that contains a
+**Three of the twenty are the same mistake**: an identifier that contains a
 date (4, 10) or a null that means two different things (13, 14). Both are
 cases where a value's *shape* was trusted instead of its *meaning*.
 
@@ -787,6 +797,82 @@ and at a few milliseconds it is not worth a cache's invalidation problem.
 What remains genuinely missing from a production-hardening point of view is
 request tracing and a metrics backend. Both are listed as bonus items, both
 need infrastructure a free tier does not provide, and neither is claimed.
+## Interface
+
+`src/ragsys/api/` is deliberately thin, and the structure is the argument.
+
+```
+app.py        the application: routers wired, errors mapped, static served
+deps.py       the expensive objects, built once
+schemas.py    the published HTTP contract
+routers/      ask.py, documents.py, health.py
+static/       index.html, app.js, style.css
+```
+
+**There is no service layer in the API, because there is no business logic in
+the API.** The one piece that looked like it belonged here — handling an
+upload — is an ingestion concern: a command-line importer would want the same
+behaviour, so `ingest_upload` lives in `ingestion/pipeline.py` and is tested
+without starting a server. The test for whether something belongs in the web
+layer is whether a non-HTTP caller could want it.
+
+**There is no repository package either.** `ChunkStore` has been a protocol
+with three implementations since stage 2, which is the repository. What was
+genuinely missing was one query: the store holds chunks while the interface
+needs files, so `list_documents` groups by source path. A three-page PDF is
+three documents with ids ending `#page=1`, `#page=2`, `#page=3`, and offering
+three rows to delete separately would be an interface that misleads.
+
+**Dependencies are injected rather than imported.** The embedding model costs
+roughly twenty-five seconds and 130 MB, so it is built once. The reason to use
+`Depends` rather than a module global is testing: `tests/test_api.py` runs all
+nineteen cases against an in-process Qdrant, a stub embedder and a scripted
+model, with no cluster, no weights and no network.
+
+**Domain errors map to status codes in exactly one place.** An unsupported
+upload is 415, a missing index or unreachable model is 503, and nothing is a
+500 — a 500 would mean a case we failed to anticipate. A new router inherits
+the mapping without doing anything.
+
+**The health check reports readiness without causing it.** Touching the model
+would block for twenty-five seconds, long enough for a hosting platform's
+probe to decide the container is dead and restart it, turning the health check
+into the outage it exists to detect. It reads `Embedder.is_loaded` instead,
+and the live endpoint returns `model_loaded: false` until the first question.
+
+**Uploads replace rather than accumulate.** Change detection alone is not
+enough: if a new version of a PDF has fewer pages, the surplus pages' chunks
+belong to document ids the new file no longer produces, so nothing would ever
+update them and the system would keep citing pages that no longer exist. An
+upload therefore deletes its file's chunks before ingesting. A filename is
+also reduced to its final component, since a browser may send one containing
+path separators and joining that to a directory writes outside it.
+
+**The front end has no build step.** Plain HTML, CSS and JavaScript: nothing
+to install in the deployment image and nothing that can fail at build time.
+Citations render as clickable chips that scroll to and highlight the source
+chunk, and every retrieved source is shown rather than only the cited ones —
+an uncited but retrieved chunk is often the most informative thing on the
+page, because it shows what the model chose not to use.
+
+### Verified against the live index
+
+`GET /api/health` reported 72,294 chunks with `model_loaded: false`. Asking
+"When did the rollback of pay-gw-4.2.1 finish?" through `POST /api/ask`
+returned:
+
+```
+The rollback of pay-gw-4.2.1 finished at 15:10 according to the post-mortem
+timeline [S1], or at 15:40 according to the chat thread [S8].
+
+contradiction : S1 states 15:10, while S8 states 15:40   ['S1', 'S8']
+grounded=True  confidence=low  sources=15  invalid citations=[]
+```
+
+`GET /api/documents` listed all 86 operations files newest first, excluding
+the bulk Wikipedia corpus, which is indexed but not individually manageable.
+An upload of a `.png` returned 415 with the supported extensions named.
+
 ## Design decisions already fixed
 
 **Python 3.12, pinned `>=3.12,<3.13`.** PyTorch publishes no wheels for 3.13

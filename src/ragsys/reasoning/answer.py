@@ -61,6 +61,11 @@ class Answer:
     output_tokens: int = 0
     model: str = ""
     error: str = ""
+    # Every source the model was shown, labelled, not only the ones it cited.
+    # The interface has to let a reader inspect what was retrieved and judge
+    # whether the answer used it well, which an uncited-but-retrieved chunk is
+    # often the most informative part of.
+    sources: tuple[dict[str, Any], ...] = ()
 
     @property
     def failed(self) -> bool:
@@ -113,6 +118,7 @@ class Answer:
             "steps": list(self.steps),
             "context_size": self.context_size,
             "model": self.model,
+            "sources": [dict(s) for s in self.sources],
             "tool_calls": self.tool_calls,
             "is_grounded": self.is_grounded,
             "prompt_tokens": self.prompt_tokens,
@@ -207,6 +213,7 @@ class AnswerBuilder:
             prompt_tokens=self.prompt_tokens,
             output_tokens=self.output_tokens,
             model=self.model,
+            sources=tuple(self.supplied),
         )
 
     def failure(self, message: str) -> Answer:
@@ -225,4 +232,5 @@ class AnswerBuilder:
             tool_calls=self.tool_calls,
             model=self.model,
             error=message,
+            sources=tuple(self.supplied),
         )
