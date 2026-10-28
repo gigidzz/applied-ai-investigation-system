@@ -14,8 +14,8 @@ when it was written.
 | 0 | Foundations | Importable package, locked dependencies, validated configuration, secrets kept out of version control, test harness | done |
 | 1 | Corpus | Acquire and normalise the document set; build the labelled evaluation question set; profile the data before designing against it | done |
 | 2 | Ingestion | Per-format loaders, metadata extraction, two comparable chunking strategies, duplicate detection, add/update/delete | done |
-| 3 | Indexing | Embedding model, vector store schema with dense and sparse vectors, idempotent batch upsert | next |
-| 4 | Retrieval | Semantic search, keyword search, custom fusion and ranking, optional cross-encoder rerank | |
+| 3 | Indexing | Embedding model, vector store schema with dense and sparse vectors, idempotent batch upsert | done |
+| 4 | Retrieval | Semantic search, keyword search, custom fusion and ranking, optional cross-encoder rerank | next |
 | 5 | Reasoning | Query decomposition, tool calling, multi-source synthesis, inline citations, contradiction detection, abstention | |
 | 6 | Evaluation | Automated harness over 40+ questions; Recall@K, MRR, answer correctness, citation accuracy, abstention precision; configuration comparison | |
 | 7 | Interface | HTTP API and web UI for document management, querying and source inspection | |
@@ -135,6 +135,150 @@ below the limit.
 Both preserve every content word of every document — asserted over the whole
 committed operations corpus in `tests/test_chunking.py`, which caught two
 heading-loss bugs during development.
+
+## Indexing
+
+`src/ragsys/indexing/` builds two representations of every chunk, because the
+two fail in opposite directions. A dense embedding connects "card
+authorisation failing" to "payment gateway returned 503" while treating
+`pay-gw-4.2.1` and `pay-gw-4.2.0` as nearly the same text. A sparse term
+vector separates those two releases exactly and cannot connect the paraphrase
+at all. Retrieval merges both rankings, so both are stored under one point id.
+
+**The dense half** uses `BAAI/bge-small-en-v1.5` at 384 dimensions, chosen for
+deployability: it runs on CPU, which free hosting provides and a GPU does not,
+and 384 dimensions is a third the storage of a 1024-dimension model. Vectors
+are normalised at encode time, so cosine similarity reduces to a dot product.
+
+bge models are trained asymmetrically — a query carries a short instruction
+prefix and a passage carries none. `embed_documents` and `embed_query` are
+separate methods rather than one method with a flag, because applying the
+prefix to the wrong side degrades retrieval silently.
+
+The model's output dimension is asserted against the configured value when the
+model loads. A mismatch would otherwise appear as the vector store rejecting
+every write, with nothing pointing at the real cause.
+
+**The sparse half** is BM25, implemented directly rather than taken from a
+library, because the score has to be split across two places: the term
+frequency and length-normalisation factors are baked into the stored vector at
+index time, and the inverse document frequency is applied to the query at
+search time. The vector store only computes a dot product, so
+
+```
+stored_value(term) x query_value(term)   summed over shared terms   =   BM25
+```
+
+This identity is asserted in `tests/test_indexing.py` against an independent
+BM25 implementation, over four queries and the whole test corpus, because the
+entire hybrid design rests on it.
+
+Tokenisation is hand-written for the same reason the corpus is partly
+synthetic: identifiers are the point. A general tokeniser splits
+`pay-gw-4.2.1` into fragments and loses exactly the string that dense
+retrieval is worst at. Here a compound token is kept whole *and* emitted as
+its parts, so a query for "payment gateway" still matches a document writing
+"payment-gateway" while the full release number survives as a term of its own.
+
+No stop-word list is used. Inverse document frequency already drives the
+weight of a term appearing in most documents close to zero, and a hand-kept
+list would be one more thing to justify.
+
+### Measured results
+
+| | |
+|---|---|
+| chunks indexed | 72,294 (`structural`) |
+| points stored | 72,294 — exact match, no failures |
+| build time | 15.7 min at 77 chunks/s end to end |
+| distinct terms | 188,481 |
+| sparse statistics on disk | 2.8 MB |
+| statistics pass | 1.9 s |
+| embedding throughput | 100 chunks/s at batch 64 |
+| upload throughput | 527 chunks/s at batch 256 |
+
+The two batch sizes are deliberately different and the first build got this
+wrong. Embedding is fastest at 64 texts per forward pass, but every upsert
+pays one round trip to the cluster in London regardless of its size, so
+uploading 64 at a time spent as long waiting on the network as on the model —
+about 44 chunks/s overall. Decoupling them, so the embedder subdivides a
+larger upload batch internally, roughly doubles the end-to-end rate.
+
+### What the index shows
+
+`scripts/check_index.py` runs a question through both routes and prints them
+side by side. Two results justify the hybrid design better than any argument
+could.
+
+**An exact identifier, where meaning search misleads.** Asked for
+`pay-gw-4.2.1`, dense retrieval ranked the wrong releases above the right one:
+
+```
+MEANING   1. 0.777  release: pay-gw-4.6.0 ...        <- wrong release
+          2. 0.723  release: paymen-4.0.9 ...        <- wrong release
+          3. 0.720  release: pay-gw-4.2.1 ...        <- correct, ranked third
+
+KEYWORD   1. 39.917 release: pay-gw-4.2.1 ...        <- correct, ranked first
+          2. 39.854 INC-2026-03-14: Payment authorisation failures ...
+```
+
+Version strings are nearly indistinguishable in meaning space, exactly as
+predicted. Dense retrieval is not slightly worse here, it is wrong.
+
+**A pure paraphrase, where keyword search collapses.** Asked "why did card
+authorisation start failing", with no words shared with the source document:
+
+```
+MEANING   1. 0.696  INC-2026-02-17: Double-entry ledger recording every authorisation ...
+          2. 0.692  INC-2026-03-14: Payment authorisation failures ...
+
+KEYWORD   1. 18.655 This is why many players will place a chip on their cards ...
+          2. 16.306 Richard Timothy Jones (born January 16, 1972) ...
+```
+
+BM25 matched common words and returned Wikipedia paragraphs about card games
+and actors. The two methods fail in opposite directions on the same corpus,
+which is the whole argument for running both.
+
+### The failure this exposed
+
+Asked "when did the rollback finish", **both** routes returned generic
+rollback *runbooks* and neither returned `INC-2026-03-14.pdf` or
+`THREAD-2026-03-14-incident.txt` — the two documents that disagree about the
+answer, and the entire point of evaluation question C1.
+
+The cause is that the question names no incident, release or date, so the word
+"rollback" dominates, and documents *about* rollback procedure outrank a
+timeline entry that happens to record one finishing. Neither similarity
+measure can fix this, because both are working correctly: the query genuinely
+is more similar to a rollback runbook.
+
+This is what retrieval scoring has to address, and it is the reason the
+ranking stage needs corpus-specific signals rather than a better similarity
+measure.
+
+### Design decisions
+
+**Statistics are written to disk, not recomputed.** BM25 weights are only
+comparable if the document frequencies used at index time and at query time
+are identical. The deployed service loads `sparse_stats_structural.json`
+rather than reading the corpus, which it does not have.
+
+**Point ids are derived, not assigned.** A chunk id is 16 hexadecimal
+characters, which is exactly 64 bits, so it converts to Qdrant's integer id
+without truncation. Re-running the build therefore overwrites rather than
+duplicates, which is what makes the index idempotent and the bulk load
+resumable.
+
+**The expensive pass is resumable.** Embedding the full corpus takes about a
+quarter of an hour; losing that to a dropped connection near the end is not an
+acceptable failure mode, so progress is recorded per batch.
+
+**One strategy is indexed in full.** `structural` is the production index and
+is what satisfies the corpus-size requirement. `fixed` is indexed over a
+subset into a separate collection purely to compare the two strategies at
+stage 6; indexing both in full would double both the embedding time and the
+stored vectors to answer a question a subset answers just as well.
 
 ## Design decisions already fixed
 

@@ -11,6 +11,8 @@ authors = [
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "pydantic-settings>=2.16.1",
+    "qdrant-client>=1.20.0",
+    "sentence-transformers>=6.2.0",
 ]
 
 # Local development installs the corpus-building group too; deployment
