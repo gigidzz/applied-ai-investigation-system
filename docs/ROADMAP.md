@@ -15,8 +15,8 @@ when it was written.
 | 1 | Corpus | Acquire and normalise the document set; build the labelled evaluation question set; profile the data before designing against it | done |
 | 2 | Ingestion | Per-format loaders, metadata extraction, two comparable chunking strategies, duplicate detection, add/update/delete | done |
 | 3 | Indexing | Embedding model, vector store schema with dense and sparse vectors, idempotent batch upsert | done |
-| 4 | Retrieval | Semantic search, keyword search, custom fusion and ranking, optional cross-encoder rerank | next |
-| 5 | Reasoning | Query decomposition, tool calling, multi-source synthesis, inline citations, contradiction detection, abstention | |
+| 4 | Retrieval | Semantic search, keyword search, custom fusion and ranking, optional cross-encoder rerank | done |
+| 5 | Reasoning | Query decomposition, tool calling, multi-source synthesis, inline citations, contradiction detection, abstention | next |
 | 6 | Evaluation | Automated harness over 40+ questions; Recall@K, MRR, answer correctness, citation accuracy, abstention precision; configuration comparison | |
 | 7 | Interface | HTTP API and web UI for document management, querying and source inspection | |
 | 8 | Hardening | Test coverage, retry and timeout behaviour, caching, token and cost accounting, observability | |
@@ -279,6 +279,132 @@ is what satisfies the corpus-size requirement. `fixed` is indexed over a
 subset into a separate collection purely to compare the two strategies at
 stage 6; indexing both in full would double both the embedding time and the
 stored vectors to answer a question a subset answers just as well.
+
+## Retrieval
+
+`src/ragsys/retrieval/` decides which chunks reach the prompt. Two routes
+produce two rankings; generation can be given only one list.
+
+**Scores cannot be added.** Cosine similarity is bounded between -1 and 1 and
+BM25 is unbounded. Measured on one query, the best dense score was 0.777 and
+the best sparse score 39.917, so a sum lets sparse decide everything — and the
+same query's paraphrase counterpart had sparse retrieval confidently returning
+Wikipedia paragraphs about card games. Per-query normalisation is the other
+obvious repair and is fragile, because the normaliser is the top score, so a
+query where everything is mediocre has its best mediocre result rescaled to
+look excellent.
+
+**Reciprocal rank fusion** discards the scores and keeps positions. Its useful
+property is rewarding agreement: a chunk both routes rank highly beats a chunk
+either ranks first alone. On the release-identifier query this moves the
+correct release from third to first, with roughly twice the score of anything
+else, purely because it was the one document both routes returned.
+
+The fusion constant is 60. At that value the gap between rank 1 and rank 3 is
+about 3%, so appearing in both rankings outweighs topping one of them, which
+is the right trade when each route is known to be confidently wrong on
+different kinds of question.
+
+**Fusion cannot repair agreement on the wrong answer.** Asked "when did the
+rollback finish", all three of dense, sparse and fusion returned generic
+rollback runbooks, and none returned the incident report or chat thread that
+record a completion time. Neither engine malfunctioned: the question genuinely
+is more similar to a document about rollback procedure than to a timeline
+entry mentioning one. What is missing is not a better similarity measure but
+the knowledge that "when did X finish" asks for a record, not a procedure.
+
+### The custom ranking component
+
+Four signals, applied multiplicatively over the fused candidates:
+
+```
+final = fusion x (1 + w1*metadata + w2*type + w3*recency - w4*crowding)
+```
+
+Multiplicative because fusion scores are small and their scale depends on the
+fusion constant, so an additive bonus would need retuning whenever that
+changed. As a multiplier, a weight of 0.6 means "a full metadata match is
+worth a 60% boost" at any scale.
+
+1. **Metadata agreement.** Whether the question's identifiers — release,
+   incident, ADR, date, severity, service — match the fields ingestion
+   extracted. This is the signal neither route can produce: both see only
+   chunk text, and neither knows a chunk is *tagged* `service:
+   payment-gateway`. Service names are tested in reverse, taking the name the
+   chunk declares and looking for it in the question in both spellings,
+   because a question says "payment gateway" where the corpus writes
+   "payment-gateway".
+2. **Document type, conditioned on question type.** A temporal question
+   actively *demotes* runbooks rather than merely not boosting them, because a
+   runbook is a plausible match for the words and a poor match for the intent.
+3. **Recency, as a boost that is never negative.** Dates appear in 97.9% of
+   operations records but 0.6% of the corpus, so penalising their absence
+   would suppress all 66,581 Wikipedia paragraphs.
+4. **Crowding.** Each additional chunk from an already-represented document is
+   discounted, capped at 75% so a question whose answer genuinely spans one
+   report can still be served. Selection is greedy because the cost of a chunk
+   is not a property of the chunk but of the chunk given the current result
+   set.
+
+Reciprocal rank fusion is a published algorithm and is not claimed as
+original. What is specific to this system is the re-scoring layer: these four
+signals, their weights, the question-type classification, and the decision to
+boost rather than filter on dates. Each was added in response to a failure
+measured on this corpus rather than anticipated in advance.
+
+### Measured results
+
+Document recall at the final cut over the 23 authored operations questions,
+`scripts/compare_retrieval.py`:
+
+| configuration | doc recall | all gold found | distinct docs |
+|---|---|---|---|
+| dense-only | 80.0% | 73.9% | 8.7 |
+| sparse-only | 80.0% | 78.3% | 9.6 |
+| hybrid-fusion | 85.7% | 78.3% | 9.9 |
+| hybrid+rerank | 82.9% | 78.3% | 8.9 |
+
+**These differences are inside the noise and must not be read as a ranking.**
+23 questions carry about 53 gold documents in total, so the gap between 85.7%
+and 82.9% is roughly one and a half documents, and the cross-document category
+holds three questions, where one lost document moves the figure by eleven
+points. The sample is far too small to choose a configuration, which is why
+stage 6 measures against HotpotQA's 7,405 externally labelled questions.
+
+What is *not* noise is the query the signals were built for:
+
+```
+dense-only      1-3. three runbooks    4. hotpot/paragraphs.jsonl
+sparse-only     1-3. three runbooks    4. hotpot/paragraphs.jsonl
+hybrid-fusion   1-3. three runbooks    4. hotpot/paragraphs.jsonl
+hybrid+rerank   1-3. three runbooks    4. INC-2026-03-14.pdf   <- gold
+```
+
+Only the re-ranked configuration retrieved a gold document at all. The
+document-type signal worked in the intended direction and was too weak to
+finish the job: three runbooks still hold the top positions. Arithmetically a
+runbook keeps 72% of its score under a -0.8 preference at weight 0.35, while
+the incident report gains 35%, and the runbooks start from a higher fusion
+score because both routes agreed on them — so the correction lands just short.
+
+One consistency bug was found by tracing a query rather than by a test.
+Metadata agreement is a ratio of matched weight to *expected* weight, and the
+service check was expected whenever a **chunk** declared a service, while
+every other field was expected only when the **question** named one. A chunk
+matching a release exactly therefore scored 0.56 instead of 1.0 for also
+carrying a service tag the question never mentioned. The check now applies
+only when the chunk's service is named, or when the question names a different
+one, with releases and incident references stripped first because both are
+service-shaped. Re-running the comparison afterwards produced **identical**
+figures: the fix changed scores without changing which documents reached the
+final fifteen for these 23 questions, so it is recorded as a correctness fix
+and not as an improvement.
+
+The weights are deliberately **not** adjusted to fix this. Fitting them to 23
+questions written for this corpus would be marking our own homework, and the
+figures above would stop meaning anything. They are tuned at stage 6 against
+HotpotQA's external labels, and whatever those weights turn out to be is what
+these operations numbers get reported at.
 
 ## Design decisions already fixed
 
