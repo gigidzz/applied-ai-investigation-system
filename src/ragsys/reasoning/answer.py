@@ -59,6 +59,7 @@ class Answer:
     tool_calls: int = 0
     prompt_tokens: int = 0
     output_tokens: int = 0
+    model: str = ""
     error: str = ""
 
     @property
@@ -111,6 +112,7 @@ class Answer:
             "confidence": self.confidence,
             "steps": list(self.steps),
             "context_size": self.context_size,
+            "model": self.model,
             "tool_calls": self.tool_calls,
             "is_grounded": self.is_grounded,
             "prompt_tokens": self.prompt_tokens,
@@ -169,6 +171,7 @@ class AnswerBuilder:
     tool_calls: int = 0
     prompt_tokens: int = 0
     output_tokens: int = 0
+    model: str = ""
     _warnings: list[str] = field(default_factory=list)
 
     def from_payload(self, payload: dict[str, Any]) -> Answer:
@@ -203,6 +206,7 @@ class AnswerBuilder:
             tool_calls=self.tool_calls,
             prompt_tokens=self.prompt_tokens,
             output_tokens=self.output_tokens,
+            model=self.model,
         )
 
     def failure(self, message: str) -> Answer:
@@ -219,5 +223,6 @@ class AnswerBuilder:
             abstain_reason="the language model could not be reached",
             context_size=len(self.supplied),
             tool_calls=self.tool_calls,
+            model=self.model,
             error=message,
         )

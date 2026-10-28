@@ -224,6 +224,32 @@ def test_retryable_statuses_are_transient_only():
     assert 403 not in RETRYABLE_STATUS
 
 
+def test_quota_exhaustion_moves_to_another_model():
+    """Quotas are per model: a 429 on one says nothing about the next."""
+    from ragsys.reasoning.llm import MOVE_ON_AFTER_RETRIES, MOVE_ON_IMMEDIATELY
+
+    assert 429 in MOVE_ON_IMMEDIATELY
+    assert 404 in MOVE_ON_IMMEDIATELY
+    assert 503 in MOVE_ON_AFTER_RETRIES
+    assert 429 not in MOVE_ON_AFTER_RETRIES
+
+
+def test_an_exhausted_model_is_remembered_and_skipped():
+    """Re-asking inside a spent window is a guaranteed refusal."""
+    import time as _time
+
+    from ragsys.reasoning import llm
+
+    llm._QUOTA_BLOCKED.clear()
+    assert not llm._is_quota_blocked("m")
+    llm._QUOTA_BLOCKED["m"] = _time.monotonic()
+    assert llm._is_quota_blocked("m")
+    # Expired entries are forgotten, so a recovered model is picked back up.
+    llm._QUOTA_BLOCKED["m"] = _time.monotonic() - llm.QUOTA_MEMORY_SECONDS - 1
+    assert not llm._is_quota_blocked("m")
+    assert "m" not in llm._QUOTA_BLOCKED
+
+
 def test_an_empty_key_is_refused_before_any_request():
     with pytest.raises(LLMNotConfigured):
         GeminiClient(api_key="   ")

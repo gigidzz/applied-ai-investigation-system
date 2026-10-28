@@ -120,7 +120,12 @@ class Agent:
                 for call in response.tool_calls:
                     messages.append(self._run_tool(call, toolbox))
                 builder.supplied = register.all
-                response = self._ask(messages, tools=toolbox.declarations)
+                # On the last permitted round there is no point offering a
+                # tool that cannot be run: the model would ask, be refused,
+                # and cost a round trip. Measured at one wasted call in four
+                # on a question needing two searches.
+                remaining = rounds < self.config.max_tool_rounds
+                response = self._ask(messages, tools=toolbox.declarations if remaining else None)
 
             if response.wants_tools:
                 # Out of rounds and still asking. Answer from what is in hand
@@ -133,6 +138,10 @@ class Agent:
             builder.tool_calls = rounds
             builder.prompt_tokens = response.prompt_tokens
             builder.output_tokens = response.output_tokens
+            # Read after the call, not before: the client advances through its
+            # fallback list, so the model that answered is not necessarily the
+            # one that was asked first.
+            builder.model = getattr(self.client, "model", "")
 
             try:
                 payload = extract_json(response.text)
@@ -147,6 +156,7 @@ class Agent:
             # raised, so one failure cannot abort a run over the whole set.
             log.warning("model failed for %r: %s", question, exc)
             builder.supplied = register.all
+            builder.model = getattr(self.client, "model", "")
             return builder.failure(str(exc))
 
     # ---------- internals ----------

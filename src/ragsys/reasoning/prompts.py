@@ -180,9 +180,25 @@ JUDGE_SCHEMA: dict[str, Any] = {
 }
 
 
-def judge_prompt(question: str, reference: str, candidate: str) -> str:
+def judge_prompt(
+    question: str, reference: str, candidate: str, reference_is_behaviour: bool = False
+) -> str:
+    """Assemble the grading request.
+
+    `reference_is_behaviour` matters for contradiction questions, where no
+    single answer is correct and the key describes what the answer must *do*
+    instead. Grading "report both figures and note the discrepancy" as though
+    it were a factual answer marks a correct response wrong.
+    """
+    if reference_is_behaviour:
+        header = (
+            "REQUIRED BEHAVIOUR (not a single factual answer -- score "
+            "'correct' if the answer does what this describes)"
+        )
+    else:
+        header = "REFERENCE ANSWER"
     return (
         f"QUESTION: {question}\n\n"
-        f"REFERENCE ANSWER: {reference or '(the correct behaviour is to abstain)'}\n\n"
+        f"{header}: {reference or '(the correct behaviour is to abstain)'}\n\n"
         f"ANSWER TO GRADE: {candidate or '(empty)'}"
     )

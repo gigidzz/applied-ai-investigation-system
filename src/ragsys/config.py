@@ -76,6 +76,15 @@ class Settings(BaseSettings):
     llm_api_key: SecretStr | None = None
     llm_max_retries: int = 3
     llm_timeout_seconds: float = 60.0
+    # The free tier limits requests per minute, and exceeding it returns 429
+    # for the rest of the window. Measured the hard way: an unpaced run of 47
+    # questions exhausted the quota after the first question and produced 46
+    # failures. Pacing client-side is cheaper than retrying into a wall.
+    llm_requests_per_minute: int = 10
+    # 429 means "wait", not "try harder". Exponential backoff from a few
+    # seconds cannot clear a per-minute quota, so that status gets its own,
+    # much longer, pause.
+    llm_quota_backoff_seconds: float = 35.0
 
     # ---------- answer evaluation ----------
     # The judge is deliberately a different model from the generator, so that a

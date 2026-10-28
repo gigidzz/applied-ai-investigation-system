@@ -38,9 +38,19 @@ DEFAULT_GEMINI_MODELS = (
     "gemini-flash-lite-latest",
 )
 
-# A model that does not exist for this key is no more usable than one that is
-# overloaded, so both move on to the next candidate.
-UNUSABLE_MODEL_STATUS = frozenset({404, 503})
+# Reasons to stop asking this model and try the next one.
+#
+# Quotas are counted per model, not per key, so a 429 on one model says
+# nothing about another: measured directly, gemini-3.6-flash and
+# gemini-3.5-flash were exhausted while gemini-flash-lite-latest answered
+# immediately. Retrying the exhausted model instead spent 66 seconds to fail,
+# with a working model one line further down the list.
+#
+# 404 (the model does not exist for this key) and 429 (its quota is spent) are
+# both immediate: no amount of waiting changes either within a request. 503 is
+# a transient overload, so it is retried first and only then abandoned.
+MOVE_ON_IMMEDIATELY = frozenset({404, 429})
+MOVE_ON_AFTER_RETRIES = frozenset({503})
 
 # Status codes worth trying again. 429 is rate limiting, 500/502/503/504 are
 # transient server faults. A 400 or 403 is our mistake and retrying it only
@@ -48,6 +58,43 @@ UNUSABLE_MODEL_STATUS = frozenset({404, 503})
 RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
 
 _TLS_READY = False
+
+# Requests per minute are shared across every client in the process: the
+# generator and the judge draw on one quota, so pacing them independently
+# would exceed it by exactly a factor of two.
+_LAST_REQUEST_AT = 0.0
+
+# Models known to be quota-limited, and when that was discovered. A quota is
+# spent for a whole window, so asking again inside it is a guaranteed refusal:
+# without this, every call re-tried the exhausted models first and paid about
+# twelve seconds to learn what the previous call already knew.
+_QUOTA_BLOCKED: dict[str, float] = {}
+
+# Long enough to skip a per-minute window comfortably, short enough that a
+# model which recovers is picked back up within a run.
+QUOTA_MEMORY_SECONDS = 180.0
+
+
+def _is_quota_blocked(model: str) -> bool:
+    blocked_at = _QUOTA_BLOCKED.get(model)
+    if blocked_at is None:
+        return False
+    if time.monotonic() - blocked_at > QUOTA_MEMORY_SECONDS:
+        del _QUOTA_BLOCKED[model]
+        return False
+    return True
+
+
+def _pace(requests_per_minute: int) -> None:
+    """Sleep until the next request is allowed."""
+    global _LAST_REQUEST_AT
+    if requests_per_minute <= 0:
+        return
+    interval = 60.0 / requests_per_minute
+    wait = interval - (time.monotonic() - _LAST_REQUEST_AT)
+    if wait > 0:
+        time.sleep(wait)
+    _LAST_REQUEST_AT = time.monotonic()
 
 
 def _ensure_tls() -> None:
@@ -142,6 +189,7 @@ class GeminiClient:
         max_retries: int | None = None,
         timeout: float | None = None,
         fallbacks: tuple[str, ...] | None = None,
+        requests_per_minute: int | None = None,
     ) -> None:
         key = api_key
         if key is None and settings.llm_api_key is not None:
@@ -152,15 +200,22 @@ class GeminiClient:
             )
         self._key = key
         chosen = model or settings.llm_model
+        candidates = list(fallbacks) if fallbacks is not None else list(DEFAULT_GEMINI_MODELS)
         if chosen:
-            self.models = (chosen, *(fallbacks or ()))
-        else:
-            self.models = tuple(fallbacks) if fallbacks else DEFAULT_GEMINI_MODELS
+            # Preferred, not exclusive. Naming a model should set the order,
+            # not strand the deployment on one quota: a single model with no
+            # fallback is exactly the situation that produced 46 failures in
+            # the first evaluation run.
+            candidates = [chosen, *(m for m in candidates if m != chosen)]
+        self.models = tuple(candidates)
         # The model actually used, which reporting and the evaluation report
         # need: saying "gemini-3.6-flash" when a fallback answered is a lie.
         self.model = self.models[0]
         self.max_retries = settings.llm_max_retries if max_retries is None else max_retries
         self.timeout = settings.llm_timeout_seconds if timeout is None else timeout
+        self.requests_per_minute = (
+            settings.llm_requests_per_minute if requests_per_minute is None else requests_per_minute
+        )
 
     def generate(
         self,
@@ -191,19 +246,49 @@ class GeminiClient:
     # ---------- transport ----------
 
     def _post(self, body: dict[str, Any]) -> dict[str, Any]:
-        """Try each candidate model in turn, retrying within each."""
+        """Try each candidate model in turn, retrying within each.
+
+        If every candidate is quota-limited the windows may simply need time
+        to roll over, so the whole chain is attempted once more after a pause.
+        A single long wait beats waiting once per model, which would multiply
+        the delay by the length of the list.
+        """
         _ensure_tls()
-        failures: list[str] = []
-        for model in self.models:
-            try:
-                payload = self._post_to(model, body)
-            except _ModelUnusable as exc:
-                failures.append(f"{model}: {exc}")
-                log.warning("model %s is unusable (%s); trying the next", model, exc)
+        for pass_number in (1, 2):
+            failures: list[str] = []
+            all_quota = True
+            for model in self.models:
+                if pass_number == 1 and _is_quota_blocked(model):
+                    failures.append(f"{model}: quota known spent")
+                    continue
+                try:
+                    payload = self._post_to(model, body)
+                except _ModelUnusable as exc:
+                    failures.append(f"{model}: {exc}")
+                    if "429" in str(exc):
+                        _QUOTA_BLOCKED[model] = time.monotonic()
+                    else:
+                        all_quota = False
+                    # Logged at INFO, not WARNING. Moving to the next model is
+                    # normal operation on a free tier, and the answer records
+                    # which model produced it, so warning on every question
+                    # would be noise in front of a working result.
+                    log.info("model %s unavailable (%s); trying the next", model, exc)
+                    continue
+                _QUOTA_BLOCKED.pop(model, None)
+                self.model = model
+                return payload
+
+            if pass_number == 1 and failures and all_quota:
+                delay = settings.llm_quota_backoff_seconds
+                log.warning(
+                    "every model is quota-limited; waiting %.0fs for a window to roll over",
+                    delay,
+                )
+                time.sleep(delay)
                 continue
-            self.model = model
-            return payload
-        raise LLMUnavailable("no model answered -- " + "; ".join(failures))
+            raise LLMUnavailable("no model answered -- " + "; ".join(failures))
+        raise LLMUnavailable("no model answered after waiting for quota")
 
     def _post_to(self, model: str, body: dict[str, Any]) -> dict[str, Any]:
         url = GEMINI_ENDPOINT.format(model=model)
@@ -220,13 +305,14 @@ class GeminiClient:
                 },
             )
             try:
+                _pace(self.requests_per_minute)
                 with urllib.request.urlopen(request, timeout=self.timeout) as response:
                     return json.load(response)
             except urllib.error.HTTPError as exc:
                 detail = self._describe(exc)
-                if exc.code in UNUSABLE_MODEL_STATUS and (
-                    exc.code == 404 or attempt == self.max_retries
-                ):
+                if exc.code in MOVE_ON_IMMEDIATELY:
+                    raise _ModelUnusable(f"HTTP {exc.code}: {detail}") from exc
+                if exc.code in MOVE_ON_AFTER_RETRIES and attempt == self.max_retries:
                     raise _ModelUnusable(f"HTTP {exc.code}: {detail}") from exc
                 if exc.code not in RETRYABLE_STATUS:
                     raise LLMUnavailable(f"HTTP {exc.code} from {model}: {detail}") from exc
@@ -250,9 +336,15 @@ class GeminiClient:
                     self.max_retries,
                     exc,
                 )
-            # Exponential backoff with jitter: several callers retrying in step
-            # would arrive together and be rate limited together.
-            time.sleep(min(2.0**attempt, 8.0) * (0.5 + random.random() / 2))
+            # A quota refusal needs a pause long enough for the window to
+            # roll over; a transient server fault needs only a moment. Jitter
+            # on both, because callers retrying in step arrive together and
+            # are refused together.
+            if isinstance(last, urllib.error.HTTPError) and last.code == 429:
+                delay = settings.llm_quota_backoff_seconds * attempt
+            else:
+                delay = min(2.0**attempt, 8.0)
+            time.sleep(delay * (0.5 + random.random() / 2))
 
         raise LLMUnavailable(f"exhausted {self.max_retries} attempts: {last}")
 
@@ -262,7 +354,11 @@ class GeminiClient:
             body = json.load(exc)
         except (json.JSONDecodeError, ValueError):
             return exc.reason or "no detail"
-        return str(body.get("error", {}).get("message", ""))[:200] or "no detail"
+        message = str(body.get("error", {}).get("message", ""))
+        # Trimmed hard: the provider's quota message is several hundred
+        # characters of billing guidance, and the status code is the
+        # actionable part.
+        return message.split(". ")[0][:120] or exc.reason or "no detail"
 
     # ---------- response shape ----------
 

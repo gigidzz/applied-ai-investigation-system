@@ -16,6 +16,7 @@ from ragsys.indexing.sparse import SparseEncoder, SparseStats
 from ragsys.indexing.vector_store import QdrantChunkStore
 from ragsys.logging import setup_logging
 from ragsys.reasoning.agent import Agent, AgentConfig
+from ragsys.reasoning.llm import DEFAULT_GEMINI_MODELS
 from ragsys.retrieval.retriever import Retriever
 
 
@@ -61,6 +62,11 @@ def show(answer) -> None:
         f"sources={answer.context_size}  tool_calls={answer.tool_calls}  "
         f"tokens={answer.prompt_tokens}+{answer.output_tokens}"
     )
+    requested = settings.llm_model or DEFAULT_GEMINI_MODELS[0]
+    if answer.model and answer.model != requested:
+        print(f"  answered by {answer.model}, not {requested}: earlier models were unavailable")
+    elif answer.model:
+        print(f"  model: {answer.model}")
     print()
 
 

@@ -17,9 +17,9 @@ when it was written.
 | 3 | Indexing | Embedding model, vector store schema with dense and sparse vectors, idempotent batch upsert | done |
 | 4 | Retrieval | Semantic search, keyword search, custom fusion and ranking, optional cross-encoder rerank | done |
 | 5 | Reasoning | Query decomposition, tool calling, multi-source synthesis, inline citations, contradiction detection, abstention | done |
-| 6 | Evaluation | Automated harness over 40+ questions; Recall@K, MRR, answer correctness, citation accuracy, abstention precision; configuration comparison | next |
-| 7 | Interface | HTTP API and web UI for document management, querying and source inspection | |
-| 8 | Hardening | Test coverage, retry and timeout behaviour, caching, token and cost accounting, observability | |
+| 6 | Evaluation | Automated harness over 40+ questions; Recall@K, MRR, answer correctness, citation accuracy, abstention precision; configuration comparison | done |
+| 7 | Interface | HTTP API and web UI for document management, querying and source inspection | next |
+| 8 | Hardening | Test coverage, retry and timeout behaviour, caching, token and cost accounting, observability | mostly absorbed |
 | 9 | Deployment | Public URL on free-tier hosting, persistent vector storage, protected secrets | |
 | 10 | Documentation | Architecture write-up, evaluation report, AI usage report | |
 
@@ -507,6 +507,286 @@ documents cited are not the documents expected, which is exactly why stage 6
 must score retrieval and answer correctness separately rather than assuming
 one implies the other.
 
+### A known retrieval gap, recorded rather than patched
+
+Tracing an arbitrary question, `why did checkout-api fail in March`, exposed a
+real failure: the top results were a **May** incident and change-log rows, the
+March post-mortem never reached the result set, and the system abstained.
+
+The cause is measurable. The operations corpus writes dates in ISO form and
+never writes month names — `2026-03-14` appears in one chunk, while the token
+`march` appears in **3,616** chunks, almost all Wikipedia prose about people
+named March and the verb. So inverse document frequency gives `march` a *low*
+weight of 3.00 and points it at noise, while nothing connects the word to
+`03`. The embedding does not encode that calendar relationship either, and the
+question classifier reads "in March" as `factual` rather than temporal, so the
+date signal never fires.
+
+The gap is not marginal: **6 of the 23 authored questions mention a month
+name**, a quarter of the set.
+
+The obvious repair — rewriting `March` to `2026-03` before searching — was
+measured and rejected. **211 of HotpotQA's 7,405 questions mention a month**,
+and they mean years such as 631, 1937 and 2012: "From March 631 to April 631,
+Farrukhzad Khosrau V was the king of..." Assuming the corpus year would make
+those questions worse, and rewriting a user's words before retrieval breaks
+cases nobody enumerated in advance.
+
+Two sound repairs remain, both deferred until stage 6 can measure them:
+
+- **Query-time**, parse a month and year into a date range and boost chunks
+  whose `meta_date` falls inside it. Reuses the existing metadata and the
+  established rule that dates boost and never filter. No re-indexing.
+- **Index-time**, normalise each date into a written form alongside the ISO
+  one, so the question needs no rewriting at all. Cleaner, and the usual
+  answer in production systems, but it changes the sparse index and so
+  requires a rebuild.
+
+The reason for deferring is the same reason stage 6 precedes stage 8 in this
+plan: there is currently no harness that could demonstrate either repair helped
+the operations questions without harming the 211 HotpotQA questions. Changing
+retrieval on the evidence of one failing question, with no baseline to compare
+against, is how a system acquires fixes nobody can justify later.
+
+What the trace did confirm is that grounding works. A system answering from
+its own knowledge would have reported the May outage as the cause with every
+appearance of confidence. This one declined to answer.
+
+## Evaluation
+
+`src/ragsys/evaluation/` scores the system against **47 questions** assembled
+into one file, `data/eval/test_set.jsonl`, so the count is visible in one
+place rather than requiring two numbers and a sampling rule to be explained.
+
+| category | count | source |
+|---|---|---|
+| simple | 13 | authored |
+| cross-document synthesis | 7 | authored |
+| contradiction | 4 | authored |
+| unanswerable | 3 | authored |
+| multi-step | 20 | HotpotQA, externally labelled |
+
+Four of the synthesis questions were added at this stage, because three was
+too thin for a category the brief names explicitly: with three questions one
+failure moves the figure by 33 points, so the number carries no information.
+They were written from `scripts/ops_corpus/facts.py`, which predates all
+retrieval code, and deliberately **without running retrieval on them first**,
+so the gold sets record where the facts live rather than what the system
+happens to return. That they were authored later than the rest is recorded
+here rather than left for someone to notice.
+
+The HotpotQA sample is drawn with a fixed seed. An evaluation whose question
+set changes between runs cannot support a claim that a change improved
+anything.
+
+**Retrieval and answers are measured separately and never averaged.** They
+fail independently, and stage 5 demonstrated it: the synthesis question was
+answered correctly from the incident report and the monthly operations report
+while the answer key names the change log and the service catalogue. Scoring
+them as one number would have recorded that as a partial failure.
+
+**The two groups are also never averaged.** HotpotQA is 20 externally labelled
+Wikipedia questions; the authored set is 27 questions over documents we wrote.
+A blended figure would let a good retrieval score conceal bad contradiction
+handling.
+
+### Metrics, and the failure each one catches
+
+**Recall@K** — did the needed documents arrive at all. The failure no prompt
+can repair. **MRR** — how high the first one ranked, because only the top of
+the list is read closely. **Precision@15** — reported, not optimised: a chunk
+can be useful context without being in the answer key. **Citation validity**
+— the fraction of citations pointing at a source that was actually supplied,
+which is arithmetic rather than judgement and is the fabrication check.
+**Citation relevance** — overlap between cited documents and the answer key,
+reported rather than maximised for the reason above. **Abstention precision
+and recall**, kept separate: a system that abstains constantly scores
+perfectly on one and terribly on the other. **Contradiction detection** —
+measured only on the questions where disagreement exists.
+
+Unanswerable questions are scored in code rather than by the judge. The
+correct behaviour is known exactly, so a model call would be both a wasted
+request and a less reliable answer than a boolean.
+
+### A bug the inconsistency exposed
+
+The first run reported **0.0% recall on HotpotQA alongside 75% of gold
+documents found** — figures that cannot both be true. The cause was in the
+harness, not the system: it offered the matcher both identifier forms by
+concatenating them, so fifteen results became thirty entries and every
+HotpotQA gold document landed at rank 16 or later, outside every `@k` window.
+The rank-unbounded measures still found them, which is what made the
+contradiction visible. Rank-based metrics require exactly one identifier per
+retrieved item, and two regression tests now assert it.
+
+### Measured results, retrieval
+
+47 questions, `structural` chunks, 72,294-point index.
+
+| configuration | R@5 | R@10 | R@15 | MRR | all gold found |
+|---|---|---|---|---|---|
+| dense-only | 68.4% | 77.7% | 80.9% | 0.717 | 66.0% |
+| sparse-only | 66.3% | 76.6% | 79.8% | 0.698 | 66.0% |
+| hybrid-fusion | 75.9% | 79.1% | 85.2% | **0.775** | 72.3% |
+| hybrid+rerank | 69.0% | 77.0% | **85.5%** | 0.706 | **74.5%** |
+
+**Hybrid retrieval is worth about 5 points of recall@15 over either route
+alone**, and 6 to 8 points on retrieving every needed document. That is the
+system's central design decision, and on 47 questions it is no longer a
+measurement inside the noise.
+
+The comparison between fusion alone and fusion plus the ranking signals shows
+a real trade rather than a winner. The reranker retrieves **more complete**
+gold sets — 74.5% against 72.3% — while ranking the first gold document
+**lower**, MRR 0.706 against 0.775. That is the crowding penalty behaving
+exactly as designed: spreading results across documents improves the chance of
+collecting every document a synthesis question needs, and costs depth on the
+single best one. Which trade is preferable depends on whether answers need one
+document or several, so both configurations are reported rather than one being
+declared correct.
+
+| | R@15 | MRR | all gold found |
+|---|---|---|---|
+| authored (27) | 84.1% | 0.557 | 74.1% |
+| HotpotQA (20) | 87.5% | 0.908 | 75.0% |
+
+HotpotQA's MRR of 0.908 means the gold paragraph is usually rank 1, which is
+expected: its questions name their entities explicitly, so both routes agree.
+The authored questions are harder by that measure because several need three
+to five documents rather than one.
+
+By category, on `hybrid+rerank`:
+
+| category | R@5 | R@15 | all gold found |
+|---|---|---|---|
+| simple | 96.2% | 100.0% | 100.0% |
+| contradiction | 75.0% | 87.5% | 75.0% |
+| multi-step | 75.0% | 87.5% | 75.0% |
+| cross-document synthesis | 27.4% | 67.1% | 42.9% |
+| unanswerable | 0.0% | 50.0% | 33.3% |
+
+**Simple questions are solved**: 100% recall by rank 10, every gold document
+found. **Cross-document synthesis is the weakest category** at 67.1% recall
+and only 42.9% of questions retrieving every needed document — which is the
+honest consequence of asking for three to five specific documents inside
+fifteen slots, and the clearest target for further work.
+
+The unanswerable row should not be read as a failure. Those questions have no
+answer in the corpus, and their "gold" documents are where a reader would
+reasonably look, so low recall against them is close to meaningless. What
+matters for that category is whether the system abstains, which is an answer
+metric rather than a retrieval one.
+
+### Free-tier limits, measured
+
+The first attempt at answer scoring produced **46 model failures out of 47
+questions**, all HTTP 429. The diagnosis is in the run log: 46 quota refusals
+to the generator and 93 to the judge. Question 1 succeeded; everything after
+it was refused, and the reported figures — 8.5% correctness, 2.1% grounded —
+measure the rate limiter, not the system.
+
+Three causes, each now fixed:
+
+**No client-side pacing.** The run issued requests as fast as retrieval could
+feed it. The free tier limits requests per minute and returns 429 for the
+remainder of the window once exceeded, so an unpaced run converts its whole
+quota into refusals. Requests are now paced to `llm_requests_per_minute`,
+with the interval shared process-wide, because the generator and the judge
+draw on one quota and pacing them separately would exceed it by exactly a
+factor of two.
+
+**Backoff designed for the wrong failure.** 429 was handled by the same
+exponential schedule as a transient 503, capped at 8 seconds. A per-minute
+quota cannot clear in 8 seconds, so each retry was another refusal. 429 now
+has its own pause, `llm_quota_backoff_seconds`, and 503 keeps the short one.
+A quota refusal means wait, not try harder.
+
+**Too many calls per question.** The agent offered its search tool even on the
+final permitted round, so the model would request a search that could not be
+run, costing a round trip to learn nothing. Measured at one wasted call in
+four on a question needing two searches. Tools are now withheld on the last
+round.
+
+**Answer scoring is resumable.** The binding constraint is a daily quota
+rather than wall-clock time, so losing 46 scored questions to an interruption
+is expensive in a way that re-running a 16-minute index build is not. Each
+outcome is appended as it completes and replayed on the next run; a question
+recorded as failed is retried rather than replayed, since a quota refusal is
+missing data and not a result.
+
+The cost model this implies, per answerable question: one generation call,
+plus one per tool round the model chooses, plus one judge call. At two tool
+rounds that is four calls, so a 47-question run is roughly 150 to 190
+requests. Against a daily free-tier allowance in the low hundreds, a full
+answer evaluation is close to a day's entire budget — which is why the
+retrieval evaluation, costing nothing, carries four configurations while
+answer scoring runs once.
+
+## Defects found, and how each was found
+
+Recorded because *how* a bug surfaced is more useful than the bug. Almost none
+of these were found by reading the code: they were found by a test asserting a
+property, or by two measurements disagreeing with each other.
+
+| # | Defect | How it surfaced | Fix |
+|---|---|---|---|
+| 1 | `\b20\d{2}-\d{2}-\d{2}\b` missed `2026-03-14T14:20:00Z` — no word boundary between `4` and `T` | ISO date coverage reported 17.8% where 97.9% was expected | lookarounds instead of `\b` |
+| 2 | Generic runbooks were accidental near-duplicates, Jaccard 0.5–0.65 | the duplicate profiler found 10 pairs where 1 was planted | derive each runbook from its own service's history |
+| 3 | The corpus was not byte-reproducible: `python-docx` stamps zip members with wall-clock time | two builds produced different bytes | rewrite the zip with a fixed timestamp |
+| 4 | A document's date was read from anywhere in its text, so a runbook was dated from "added after INC-2026-03-14" | inspecting extracted metadata | read the date only from the first 400 characters |
+| 5 | `structural` chunking produced output identical to `fixed` on every PDF | the two strategies gave the same chunk counts | pypdf text has zero blank lines; added a sentence-level fallback |
+| 6 | Headings were used for metadata and then discarded, losing their words | a property test asserting no content word is lost | hold a heading-only block and prepend it to the next |
+| 7 | Citation paths were absolute, and would have been baked into every stored chunk | reading a chunk record | paths relative to the corpus root |
+| 8 | Index build ran at 6 chunks/s, extrapolating to three hours | the measured rate contradicted the estimate | the embedder is CPU-bound at 64 and the upload latency-bound at 256; decouple the two batch sizes |
+| 9 | Metadata agreement diluted an exact release match to 0.56 because the chunk declared a service the question never mentioned | tracing one query's signals | the service check applies only when a service is named |
+| 10 | `INC-2026-03-14` contains `2026-03-14`, so an identifier match counted as a missing date | a test asserting an exact match scores 1.0 | strip identifiers before reading dates |
+| 11 | A retired model alias returns 404 and a popular one returns 503, failing a question while an equivalent model is idle | the first live call failed | a fallback chain across models |
+| 12 | Rank metrics read 0.0% recall on HotpotQA while 75% of gold documents were found | two measurements that cannot both be true | one identifier per rank, not two concatenated lists |
+| 13 | Contradiction questions were credited for abstaining, because a null reference answer was read as "should abstain" | a script printing "7 expect an abstention" when 3 do | key abstention on the category alone |
+| 14 | The judge was told the required behaviour for a contradiction question was to abstain, marking correct answers wrong | the category scored 0% correct while contradiction detection scored 50% | grade against the behaviour the answer key describes |
+| 15 | An unpaced evaluation run exhausted the free tier after one question: 46 failures | the run's own output | pace requests, give 429 its own long backoff, stop offering a tool on the final round |
+| 16 | 429 did not trigger the model fallback, so a question failed while a working model sat one line below in the list | asking a question by hand after the quota ran out | 429 moves on immediately, and exhausted models are remembered |
+| 17 | The answer never recorded which model produced it, so a fallback was invisible | reading the output of a question answered by a fallback | `Answer.model`, reported when it differs from the model requested |
+| 18 | `--progress` was defined but never passed to the harness, so a run could not resume | the progress file did not exist after a run | wire it through, and assert it by parsing the call site |
+
+Two patterns are worth naming.
+
+**Most of these were found by a property test or a contradiction between two
+numbers, not by review.** Defects 6, 10 and 12 were caught by assertions;
+defects 8, 13 and 14 were caught because two measurements disagreed. That is
+the argument for measuring the same thing two ways wherever it is cheap.
+
+**Three of the eighteen are the same mistake**: an identifier that contains a
+date (4, 10) or a null that means two different things (13, 14). Both are
+cases where a value's *shape* was trusted instead of its *meaning*.
+
+## Stage 8, and why it has no separate section
+
+Hardening was planned as a stage of its own and ended up being done inside the
+stages that needed it, which is the better outcome: each piece was added in
+response to a failure that had actually occurred rather than from a checklist.
+
+| Stage 8 item | Where it happened | State |
+|---|---|---|
+| Test coverage | throughout | **216 tests**, property-based where it matters |
+| Retry behaviour | stage 5, corrected in stage 6 | retryable statuses separated from quota refusals and from models that cannot serve at all |
+| Timeouts | stages 3 and 5 | on every model call and every vector-store call |
+| Rate limiting | stage 6 | paced process-wide, after an unpaced run produced 46 failures |
+| Token and cost accounting | stage 5 | recorded per answer, aggregated per evaluation run, and the free-tier budget is worked out in this document |
+| Error handling | stage 5 | a model outage becomes a recorded result rather than an exception, so one failure cannot abort a run of 47 questions |
+| Observability | stages 0 and 5 | structured logging with module names; no tracing or metrics backend |
+| **Caching** | **not done** | **cut** |
+
+**Caching is the one item genuinely dropped**, and it is a bonus in the brief
+rather than a requirement. The obvious candidate is an answer cache keyed on
+the question, which would help a demo where the same question is asked twice
+and nothing else — the evaluation asks each question once, and a grader is
+unlikely to repeat one. Embedding the query is the only other repeated cost,
+and at a few milliseconds it is not worth a cache's invalidation problem.
+
+What remains genuinely missing from a production-hardening point of view is
+request tracing and a metrics backend. Both are listed as bonus items, both
+need infrastructure a free tier does not provide, and neither is claimed.
 ## Design decisions already fixed
 
 **Python 3.12, pinned `>=3.12,<3.13`.** PyTorch publishes no wheels for 3.13

@@ -30,6 +30,9 @@ data/corpus/*
 !data/eval/
 data/eval/*
 !data/eval/ops_questions.jsonl
+# The combined question set is the answer key the evaluation is scored
+# against, so it is versioned. Reports derived from it are not.
+!data/eval/test_set.jsonl
 # Analysis documents live in docs/, not here.
 
 # ---- model weights / HF cache ----
