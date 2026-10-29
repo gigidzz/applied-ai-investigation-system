@@ -566,3 +566,27 @@ def test_groq_offers_no_tools():
     client = GroqClient(api_key="k")
     with pytest.raises(LLMNotConfigured):
         client.generate([user_message("x")], tools=[{"name": "search"}])
+
+
+def test_each_provider_is_paced_against_its_own_quota():
+    """A Groq request consumes none of Google's allowance.
+
+    Sharing one budget across providers halves throughput for nothing; sharing
+    none within a provider overruns the quota by the number of clients.
+    """
+    from ragsys.reasoning import llm
+
+    llm._LAST_REQUEST_AT.clear()
+    llm._pace(600, "gemini")
+    llm._pace(600, "groq")
+    assert set(llm._LAST_REQUEST_AT) == {"gemini", "groq"}
+    assert llm._LAST_REQUEST_AT["gemini"] != 0.0
+    assert llm._LAST_REQUEST_AT["groq"] != 0.0
+
+
+def test_pacing_is_disabled_by_a_non_positive_rate():
+    from ragsys.reasoning import llm
+
+    llm._LAST_REQUEST_AT.clear()
+    llm._pace(0, "gemini")
+    assert llm._LAST_REQUEST_AT == {}

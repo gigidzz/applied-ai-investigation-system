@@ -14,8 +14,12 @@ document: it decomposes the question, retrieves across the corpus, connects
 facts from separate sources, cites every claim, flags contradictions between
 sources, and declines to answer when the corpus does not support one.
 
-See [docs/ROADMAP.md](docs/ROADMAP.md) for the development plan and the
-rationale behind the fixed design decisions.
+| Document | What it covers |
+|---|---|
+| [docs/EVALUATION.md](docs/EVALUATION.md) | testing methodology, metrics, results and failure analysis |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | the development plan, the defect log, and the rationale behind each fixed design decision |
+| [docs/AI_USAGE.md](docs/AI_USAGE.md) | how an AI coding assistant was used, and where its judgement was wrong |
+| [docs/CORPUS_PROFILE.md](docs/CORPUS_PROFILE.md) | what is in the document collection, measured |
 
 ## Stack
 
@@ -88,7 +92,7 @@ because the embedding model loads on first use. `GET /api/health` reports
 ### 4. Check the evaluation
 
 ```bash
-uv run python scripts/build_test_set.py    # assemble the 47 questions
+uv run python scripts/build_test_set.py    # assemble the 57 questions
 uv run python scripts/evaluate.py          # retrieval, four configurations (free)
 uv run python scripts/evaluate.py --answers  # answer quality (~150 model calls)
 ```
@@ -116,6 +120,114 @@ Logs go to stderr, which is where container platforms collect them; there is
 no log file by design, since a file inside an ephemeral container is written
 for nobody to read. Set `LOG_LEVEL=INFO` in `.env` to see retrieval decisions,
 tool searches and model fallbacks, or `DEBUG` for everything.
+
+## Architecture
+
+### How a question is answered
+
+```
+question
+   |
+   v
+[1] classify ------------------- temporal / identifier / conceptual / synthesis
+   |                             decides which ranking signals apply
+   v
+[2] two searches, in parallel
+   |
+   |-- dense    question -> 384-dim vector -> HNSW nearest neighbours
+   |              handles paraphrase, poor on exact identifiers
+   |
+   `-- sparse   question -> weighted terms -> BM25 dot product
+                  exact on identifiers, blind to paraphrase
+   |
+   v
+[3] reciprocal rank fusion ----- discards both scores, keeps ranks,
+   |                             rewards passages both routes agree on
+   v
+[4] re-rank, four signals ------ metadata agreement, document type given
+   |                             question type, recency, crowding penalty
+   v
+[5] greedy selection ----------- top 15 passages, spread across documents
+   |
+   v
+[6] the model, with a tool ----- answers, or calls search_documents and
+   |                             comes back here with more passages
+   v
+[7] validate ------------------- every citation must name a passage that was
+   |                             actually supplied; invalid ones are recorded
+   v
+answer + citations + contradictions + abstention + confidence
+```
+
+Steps 1 to 5 are the retrieval stage and involve no language model. Step 6 is
+the only part that does, and step 7 checks its output against what it was
+given rather than trusting it.
+
+### Why the pieces are what they are
+
+**Two retrieval routes, not one.** Dense and sparse search fail in opposite
+directions on the same corpus: asked for `pay-gw-4.2.1`, dense search ranked
+`pay-gw-4.6.0` higher, because version strings are nearly identical in
+meaning-space; asked "why did card authorisation start failing", sparse search
+returned Wikipedia paragraphs about poker chips, because the question shares no
+words with its source. Running both and fusing the ranks is worth about five
+points of recall@15 over either alone, measured in
+[docs/EVALUATION.md](docs/EVALUATION.md).
+
+**BM25 is computed by hand, split across the query and the document.** The
+term-frequency and length-normalisation parts depend only on the document, so
+they are stored in the sparse vector at index time; the IDF part depends only
+on the corpus, so it is applied to the query. Their dot product reconstructs
+the BM25 score, which is what lets a vector database serve a keyword ranking
+it knows nothing about.
+
+**Rank fusion rather than score blending.** A cosine similarity and a BM25
+score are not on the same scale and have no meaningful sum. Fusion throws both
+away and combines positions instead, so no weight has to be invented.
+
+**The agent decides whether it needs more.** The model is given a search tool
+and may call it when the supplied passages are not enough. This is what makes
+multi-step questions work without hard-coding a decomposition step: the
+system's own account of what it searched for is in the `steps` field of every
+answer.
+
+**The output is JSON, not prose.** Abstention, contradictions and confidence
+are fields, not phrasing to be parsed. Deciding whether "I'm not sure, but..."
+counts as a refusal is guesswork; reading a boolean is not.
+
+### Deployment
+
+```
+browser
+   |  HTTPS
+   v
+Render (Docker, free tier, 512 MB)
+   |     FastAPI + uvicorn, single container, listens on $PORT
+   |     embedding model baked into the image at build time
+   |
+   |---> Qdrant Cloud (eu-west-2)      72,294 vectors, dense + sparse
+   |                                   payload indexes on source path
+   |
+   `---> generative model API          free tier, daily quota,
+                                       model fallback chain on failure
+```
+
+The container holds no state. The index lives in Qdrant Cloud, so a restart
+loses nothing, and the embedding model is inside the image rather than
+downloaded on boot, so a cold start does not depend on a model registry being
+reachable.
+
+**The 512 MB limit is the binding constraint**, and it is why the embedding
+model runs under ONNX Runtime rather than PyTorch: 345 MB resident instead of
+626 MB. The vectors from the two runtimes agree to 0.999999 cosine
+similarity, so the change needed no re-indexing.
+
+**Failure handling is layered**, because every external call here is on a free
+tier: requests are paced to stay under the per-minute rate, a 429 or 404 moves
+immediately to the next model in a fallback chain, a 503 is retried with
+exponential backoff and jitter first, and a model that returns a quota error
+is remembered and skipped for the rest of the run. An evaluation that lost 46
+of 47 questions to quota exhaustion is the reason all four exist.
 
 ## Layout
 

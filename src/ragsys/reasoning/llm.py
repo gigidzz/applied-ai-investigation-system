@@ -71,7 +71,14 @@ _TLS_READY = False
 # Requests per minute are shared across every client in the process: the
 # generator and the judge draw on one quota, so pacing them independently
 # would exceed it by exactly a factor of two.
-_LAST_REQUEST_AT = 0.0
+# One pacing budget per provider, shared by every client that uses it.
+#
+# Both halves of that matter. Within a provider the budget must be shared,
+# because the generator and a judge on the same key draw on one quota, and
+# pacing them separately would exceed it by the number of clients. Across
+# providers it must not be: a Groq request consumes none of Google's
+# allowance, and pacing them together simply halves throughput.
+_LAST_REQUEST_AT: dict[str, float] = {}
 
 # Models known to be quota-limited, and when that was discovered. A quota is
 # spent for a whole window, so asking again inside it is a guaranteed refusal:
@@ -94,16 +101,15 @@ def _is_quota_blocked(model: str) -> bool:
     return True
 
 
-def _pace(requests_per_minute: int) -> None:
-    """Sleep until the next request is allowed."""
-    global _LAST_REQUEST_AT
+def _pace(requests_per_minute: int, provider: str) -> None:
+    """Sleep until this provider's next request is allowed."""
     if requests_per_minute <= 0:
         return
     interval = 60.0 / requests_per_minute
-    wait = interval - (time.monotonic() - _LAST_REQUEST_AT)
+    wait = interval - (time.monotonic() - _LAST_REQUEST_AT.get(provider, 0.0))
     if wait > 0:
         time.sleep(wait)
-    _LAST_REQUEST_AT = time.monotonic()
+    _LAST_REQUEST_AT[provider] = time.monotonic()
 
 
 def _ensure_tls() -> None:
@@ -311,7 +317,7 @@ class GeminiClient:
                 },
             )
             try:
-                _pace(self.requests_per_minute)
+                _pace(self.requests_per_minute, "gemini")
                 with urllib.request.urlopen(request, timeout=self.timeout) as response:
                     return json.load(response)
             except urllib.error.HTTPError as exc:
@@ -564,7 +570,7 @@ class GroqClient:
                 },
             )
             try:
-                _pace(self.requests_per_minute)
+                _pace(self.requests_per_minute, "groq")
                 with urllib.request.urlopen(request, timeout=self.timeout) as response:
                     return json.load(response)
             except urllib.error.HTTPError as exc:

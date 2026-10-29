@@ -39,6 +39,16 @@ DISAGREEMENT
 between them and do not average them.
 - Report both values, attribute each to its source, and add an entry to \
 "contradictions" naming the sources that disagree.
+- A later date, or a status of "accepted", does not cancel the disagreement. \
+Report both, then say which source is the more recent or more authoritative \
+and why, and still add the "contradictions" entry.
+- This applies when one source is a record of current state -- a catalogue, a \
+service definition, a configuration file -- and another source says that \
+state has changed. Do not answer only with the change. State what the record \
+still says, state the change, and record that the record has not been \
+updated. A reader who would otherwise trust that record needs to know it is \
+stale, so answering only with the newer value is wrong even though the newer \
+value is right.
 
 REASONING
 - For a question needing several pieces of information, use the \
