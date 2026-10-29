@@ -34,6 +34,14 @@ data/eval/*
 # against, so it is versioned. Reports derived from it are not.
 !data/eval/test_set.jsonl
 # Analysis documents live in docs/, not here.
+!data/processed/
+data/processed/*
+# The BM25 statistics are the one derived file the running service needs: it
+# weights a query's terms against them, and they must be the same statistics
+# the index was built with. At 2.7 MB they travel with the code; the 131 MB of
+# chunks they were computed from do not, because only the index build reads
+# those.
+!data/processed/sparse_stats_structural.json
 
 # ---- model weights / HF cache ----
 models/
