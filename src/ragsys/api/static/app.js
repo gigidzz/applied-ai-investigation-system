@@ -53,7 +53,7 @@ async function refreshHealth() {
       ? "search model ready"
       : "search model loads on the first question";
     el.textContent =
-      `${chunks} searchable passages indexed · ${ready}`;
+      `${chunks} searchable chunks indexed · ${ready}`;
     el.title =
       `status ${h.status} · Qdrant collection "${h.collection}" · ` +
       `embedding model ${h.embedding_model}`;
@@ -143,7 +143,7 @@ function renderAnswer(answer) {
   const summary = $("sources-summary");
   details.open = !answer.abstained;
   summary.innerHTML = answer.abstained
-    ? `Searched ${answer.sources.length} passages &mdash; <span class="hint">none of them answered the question</span>`
+    ? `Searched ${answer.sources.length} chunks &mdash; <span class="hint">none of them answered the question</span>`
     : `Sources <span class="hint">the model saw all of these; cited ones are marked</span>`;
 }
 
@@ -182,21 +182,21 @@ async function refreshDocuments() {
     const data = await call("/api/documents?limit=300");
     $("documents-summary").textContent =
       `${data.shown} documents you can manage · ` +
-      `${data.total_chunks.toLocaleString()} passages indexed in total ` +
+      `${data.total_chunks.toLocaleString()} chunks indexed in total ` +
       `(the bulk Wikipedia corpus is searchable but not listed here)`;
     // A list rather than a table: the panel is too narrow for five columns,
     // and a path has no spaces to wrap at, so columns either collide or
     // overflow. Two lines per document reads cleanly at any width.
     list.innerHTML = data.documents
       .map((d) => {
-        const passages = `${d.chunk_count} passage${d.chunk_count === 1 ? "" : "s"}`;
-        const facts = [d.format, d.date || "no date", passages].map(escapeHtml).join(" · ");
+        const chunks = `${d.chunk_count} chunk${d.chunk_count === 1 ? "" : "s"}`;
+        const facts = [d.format, d.date || "no date", chunks].map(escapeHtml).join(" · ");
         return `<li>
           <div class="doc-path" title="${escapeHtml(d.source_path)}">${escapeHtml(d.source_path)}</div>
           <div class="doc-row">
             <span class="doc-facts">${facts}</span>
             <button class="delete" data-path="${escapeHtml(d.source_path)}"
-              title="remove this document and all of its passages">delete</button>
+              title="remove this document and all of its chunks">delete</button>
           </div>
         </li>`;
       })
@@ -218,7 +218,7 @@ async function upload(file) {
     const result = await call("/api/documents", { method: "POST", body: form });
     out.textContent =
       `indexed ${result.filename}: ${result.documents} document(s), ` +
-      `${result.chunks_written} searchable passage(s)`;
+      `${result.chunks_written} searchable chunk(s)`;
     out.className = "ok";
     $("file").value = "";
     await Promise.all([refreshDocuments(), refreshHealth()]);
@@ -237,7 +237,7 @@ async function remove(path) {
       method: "DELETE",
     });
     $("upload-result").textContent =
-      `removed ${path} from the index (${result.chunks_removed} passage(s))`;
+      `removed ${path} from the index (${result.chunks_removed} chunk(s))`;
     $("upload-result").className = "ok";
     await Promise.all([refreshDocuments(), refreshHealth()]);
   } catch (err) {

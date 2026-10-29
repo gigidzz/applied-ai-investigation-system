@@ -873,6 +873,44 @@ grounded=True  confidence=low  sources=15  invalid citations=[]
 the bulk Wikipedia corpus, which is indexed but not individually manageable.
 An upload of a `.png` returned 415 with the supported extensions named.
 
+### The document lifecycle, verified end to end
+
+The API tests run against an in-process Qdrant with a stub embedder, which
+proves the HTTP contract and nothing about embeddings. So the whole lifecycle
+was also run against the live index with the real model, using a fictional
+`zeppelin-gateway` service so that no answer could come from the existing
+corpus.
+
+| step | result |
+|---|---|
+| ask before uploading | abstained: "no information about a service named zeppelin-gateway" |
+| upload | 2 chunks written, 72,294 to 72,296, listed as `uploads/zeppelin-runbook.md` |
+| ask again | "77 connections per pod [S2][S15]", citing the uploaded file |
+| ask a paraphrase | answered from the escalation section |
+| re-upload unchanged | still 2 chunks, still answerable |
+| re-upload edited | answers the new value, 0 stale chunks retrievable |
+| delete | 2 chunks removed, back to 72,294 |
+| ask once more | abstained again |
+
+The paraphrase step is the one that proves embedding rather than plumbing.
+Asked "Who should be paged if airship mooring telemetry stops arriving?" —
+a question sharing almost no words with the document — the system answered
+from the escalation section, on vectors created seconds earlier.
+
+Two defects were found by running this and nothing else found them. An upload
+wrote **both** chunking strategies into an index built with one, storing every
+uploaded chunk twice; and re-uploading an unchanged file **deleted it**,
+because replacement removes the file's chunks first and change detection then
+reported UNCHANGED and skipped the write. Both are in the defect log as 19 and
+20, and both now have regression tests.
+
+**Deleting `change-log.csv` is allowed, and that is deliberate.** It is one
+document in the interface despite producing 298 chunks, one per deploy, and it
+is gold for two evaluation questions. Protecting particular files from
+deletion would be an arbitrary special case in a document-management
+interface, and the file is committed to the repository, so deleting it from
+the index is recoverable by uploading it again.
+
 ## Design decisions already fixed
 
 **Python 3.12, pinned `>=3.12,<3.13`.** PyTorch publishes no wheels for 3.13
