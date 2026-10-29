@@ -64,7 +64,8 @@ def setup_logging(level: str | None = None) -> None:
         "huggingface_hub",
         "fsspec",
         "filelock",
-        "sentence_transformers",
+        "fastembed",
+        "onnxruntime",
         "qdrant_client",
     ):
         logging.getLogger(noisy).setLevel(logging.WARNING)

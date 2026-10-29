@@ -6,15 +6,23 @@ readme = "README.md"
 authors = [
     { name = "dzimistarishviligigi", email = "dzimistarishviligigi@gmail.com" }
 ]
-# Upper bound is deliberate: PyTorch publishes no wheels for 3.13+ yet, and
-# free hosting platforms run 3.12. Failing fast here beats failing at install time.
+# Free hosting platforms run 3.12, and matching local to deployed avoids
+# debugging version differences at release time.
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "fastapi>=0.162.0",
+    # The embedding model runs under ONNX Runtime rather than PyTorch. Same
+    # weights and the same vectors to 0.999999 cosine similarity, measured;
+    # 345 MB resident instead of 626 MB, which is the difference between
+    # fitting a 512 MB free tier and not. See docs/ROADMAP.md.
+    "fastembed>=0.9.1",
     "pydantic-settings>=2.16.1",
     "python-multipart>=0.0.32",
     "qdrant-client>=1.20.0",
-    "sentence-transformers>=6.2.0",
+    # Not optional on macOS: the python.org build ships no certificate
+    # bundle, so every HTTPS call fails without it. It was previously
+    # present only as a transitive dependency of a package since removed.
+    "truststore>=0.10.5",
     "uvicorn[standard]>=0.54.0",
 ]
 
@@ -42,6 +50,10 @@ testpaths = ["tests"]
 addopts = "-q"
 
 [dependency-groups]
+compare = [
+    # Only to reproduce the PyTorch/ONNX vector comparison.
+    "sentence-transformers>=6.2.0",
+]
 corpus = [
     "datasets>=5.1.0",
     "pypdf>=6.21.2",

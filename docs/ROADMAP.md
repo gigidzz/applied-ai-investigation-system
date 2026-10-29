@@ -911,6 +911,114 @@ deletion would be an arbitrary special case in a document-management
 interface, and the file is committed to the repository, so deleting it from
 the index is recoverable by uploading it again.
 
+## Deployment memory, and the optimisation not taken
+
+Measured before choosing a host, which is the only reason the right host was
+chosen:
+
+| | |
+|---|---|
+| bare Python | 10 MB |
+| + PyTorch imported | 189 MB |
+| + `bge-small` loaded | 489 MB |
+| + one query embedded | 576 MB |
+| + BM25 statistics | 616 MB |
+| + FastAPI and uvicorn | **626 MB** |
+
+**PyTorch and the model are 489 MB of the 626.** Everything this project
+actually wrote — the BM25 statistics, retrieval, reasoning, the API — is
+137 MB.
+
+That number decides the hosting question rather than opinion deciding it.
+Render's and Koyeb's free tiers cap at 512 MB, so they fail by 114 MB; Vercel
+caps a deployment at 250 MB, which PyTorch exceeds on its own; and Hugging
+Face Spaces now requires a paid plan for any Python backend, returning
+`402 Payment Required` on repository creation. What remains free and large
+enough is Google Cloud Run, where memory is a setting, and Oracle's Always
+Free tier, which offers 24 GB on an ARM instance at the cost of running a
+virtual machine.
+
+### Why PyTorch is there at all
+
+It is the engine that executes the embedding model, pulled in by
+`sentence-transformers` rather than imported directly. It is a framework built
+for training large models on GPUs, and this system uses one forward pass of a
+small model on a CPU.
+
+The choice was right for the work it was made for. Stage 3 selected
+`bge-small` "for deployability: it runs on CPU, which free hosting provides
+and a GPU is not", and the index build embedded 72,294 chunks locally, which
+is exactly the case where a local model beats an API. The constraint that
+turned out to bind was memory, not CPU availability, and that was not
+measurable until there was an application to measure.
+
+### ONNX Runtime, adopted
+
+The same model now runs under **ONNX Runtime** instead of PyTorch: a runtime
+built for inference rather than for training. The weights are unchanged, so
+the vectors are unchanged and **the 72,294-vector index was not rebuilt**.
+
+Verified before adopting, because swapping the runtime on faith would risk
+silently changing every new query vector while the index kept the old ones —
+a degradation no existing test would catch:
+
+| | cosine similarity to the PyTorch vector |
+|---|---|
+| query, with the instruction prefix | **0.999999** |
+| document text | **0.999999** |
+| query, via fastembed's own `query_embed` | 0.958 to 0.991 |
+
+That third row is the trap. `fastembed` offers a `query_embed` helper which
+applies a prefix of its own, and its output matches this index at only 0.96 to
+0.99 — close enough to look correct in a demo and far enough to rank
+differently. The prefix is therefore applied explicitly and the plain `embed`
+path is used throughout.
+
+| | PyTorch | ONNX Runtime |
+|---|---|---|
+| bare Python | 10 MB | 10 MB |
+| + runtime imported | 189 MB | 98 MB |
+| + model loaded and run | 489 MB | 276 MB |
+| + BM25 statistics | 616 MB | 306 MB |
+| + web stack | **626 MB** | **345 MB** |
+
+**345 MB instead of 626 MB**, which moves the service inside every 512 MB free
+tier it was previously excluded from, and shrinks the image by whatever CUDA
+would have contributed. End-to-end behaviour is unchanged: the planted
+contradiction returns the same two times from the same two sources.
+
+`sentence-transformers` is kept in a `compare` dependency group so the
+measurement above can be reproduced, and is absent from the deployed image.
+
+## Hosting, and the two hosts not used
+
+Measured first, then chosen. The service holds **345 MB** at peak, so the
+question was which free tier fits it and with how little ceremony.
+
+| host | outcome |
+|---|---|
+| **Render** | chosen: 512 MB free tier, 167 MB of headroom, Docker native, no payment method required |
+| Google Cloud Run | fits, memory is a setting, but requires a billing account with a card on file |
+| Oracle Always Free | fits with 24 GB, and means running and securing a virtual machine |
+| Hugging Face Spaces | refused at `create_repo` with `402 Payment Required`: only static Spaces are free, and this is a Python backend |
+| Koyeb, Vercel | excluded by the measurement, not by preference — 512 MB and a 250 MB bundle limit against a footprint that was 626 MB before the runtime change |
+
+Hugging Face is worth recording because the Dockerfile and an upload script
+were written against it before the policy was discovered. Cloud Run was
+prepared to the point of a deploy script and then set aside when the ONNX
+change brought a 512 MB tier back into range; both were removed rather than
+left in the repository as dead paths.
+
+Render builds from GitHub rather than from a local upload, which is the one
+operational difference: the code must be pushed before it can be deployed.
+Secrets are set in Render's own store through `sync: false` in `render.yaml`,
+so nothing secret is committed.
+
+The free plan sleeps after inactivity. A cold start pays container startup
+plus loading the model, which is seconds rather than minutes because the
+weights are baked into the image at build time and ONNX Runtime loads faster
+than PyTorch did.
+
 ## Design decisions already fixed
 
 **Python 3.12, pinned `>=3.12,<3.13`.** PyTorch publishes no wheels for 3.13

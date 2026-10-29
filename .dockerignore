@@ -1,0 +1,19 @@
+# The 131 MB chunk file is read only by the index build, which runs offline.
+data/processed/*
+!data/processed/sparse_stats_structural.json
+data/corpus/
+data/eval/
+.venv/
+.git/
+.github/
+.claude/
+docs/
+tests/
+scripts/
+notebooks/
+**/__pycache__/
+*.pyc
+.env
+.env.*
+.pytest_cache/
+.ruff_cache/

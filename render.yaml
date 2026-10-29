@@ -1,0 +1,31 @@
+# Render reads this when the repository is connected as a Blueprint.
+#
+# Render builds from GitHub rather than from a local upload, which is the one
+# practical difference from the other hosts considered: the code has to be
+# pushed before it can be deployed.
+services:
+  - type: web
+    name: document-investigation-system
+    runtime: docker
+    plan: free
+    # Frankfurt is Render's closest region to the Qdrant cluster in London.
+    # Every question makes two calls to the vector store, so the round trip
+    # is worth keeping short; it is still tens of milliseconds against a
+    # model call measured in seconds.
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    # Readiness without causing it: this endpoint reports whether the model
+    # is loaded rather than loading it, so a probe cannot become the outage
+    # it exists to detect.
+    healthCheckPath: /api/health
+    envVars:
+      # `sync: false` means Render asks for the value once and stores it in
+      # its own secret store. Nothing secret enters the repository.
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
+      - key: LLM_API_KEY
+        sync: false
+      - key: LOG_LEVEL
+        value: INFO
