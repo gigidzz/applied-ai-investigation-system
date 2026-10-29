@@ -23,8 +23,10 @@ from ragsys.logging import get_logger
 from ragsys.reasoning.agent import extract_json
 from ragsys.reasoning.llm import (
     GeminiClient,
+    GroqClient,
     LLMClient,
     LLMError,
+    LLMNotConfigured,
     user_message,
 )
 from ragsys.reasoning.prompts import JUDGE_SCHEMA, JUDGE_SYSTEM, judge_prompt
@@ -52,15 +54,30 @@ class Verdict:
 
 
 def build_judge_client(generator_model: str | None = None) -> LLMClient:
-    """A client for grading, never the same model as the generator."""
+    """A client for grading, never the same model as the generator.
+
+    A second provider is preferred and the configuration says which. Falling
+    back to a sibling model on the generator's own key is supported because
+    an evaluation that cannot run at all is worse than one with a documented
+    caveat, but the caveat is logged every time rather than left implicit.
+    """
+    if settings.judge_provider == "groq":
+        key = settings.judge_api_key or settings.llm_api_key
+        if key is None:
+            raise LLMNotConfigured("JUDGE_PROVIDER is groq but no JUDGE_API_KEY is set in .env")
+        log.info("judging with Groq, a different model family from the generator")
+        return GroqClient(model=settings.judge_model, api_key=key.get_secret_value())
+
     key = None
     if settings.judge_api_key is not None:
         key = settings.judge_api_key.get_secret_value()
     elif settings.llm_api_key is not None:
         key = settings.llm_api_key.get_secret_value()
         log.warning(
-            "JUDGE_API_KEY is not set; grading with a different model on the "
-            "generator's key. Self-preference is reduced, not eliminated."
+            "No separate judge provider configured; grading with a different "
+            "model on the generator's key. Both share a training lineage, so "
+            "self-preference is reduced rather than eliminated and the "
+            "correctness figure should be read as optimistic."
         )
 
     model = settings.judge_model
@@ -75,6 +92,27 @@ def build_judge_client(generator_model: str | None = None) -> LLMClient:
             model,
         )
     return GeminiClient(model=model, api_key=key, fallbacks=fallbacks)
+
+
+def build_sibling_judge(generator_model: str | None = None) -> LLMClient | None:
+    """A judge from the generator's own family, for comparison only.
+
+    Used alongside the independent judge so the difference between them can
+    be reported. The difference is self-preference bias measured on this
+    system's own answers rather than quoted from elsewhere, and it costs one
+    extra call per question to have.
+    """
+    key = settings.llm_api_key
+    if key is None:
+        return None
+    candidates = [m for m in DEFAULT_JUDGE_MODELS if m != generator_model]
+    if not candidates:
+        return None
+    return GeminiClient(
+        model=candidates[0],
+        api_key=key.get_secret_value(),
+        fallbacks=tuple(candidates[1:]),
+    )
 
 
 class Judge:
@@ -122,7 +160,21 @@ class Judge:
             log.warning("judge failed for %r: %s", question[:60], exc)
             return Verdict("unscored", f"judge unavailable: {exc}", self.model)
 
-        verdict = str(payload.get("verdict", "")).lower()
+        # The field name is specified in the prompt, but only one provider
+        # enforces a schema: the other guarantees valid JSON and lets the
+        # model choose its own keys. One returned {"score": "correct"},
+        # which parsed cleanly and scored as unscored. Synonyms are accepted
+        # rather than losing a judgement to a key name.
+        raw = next(
+            (payload[key] for key in ("verdict", "score", "rating", "grade") if key in payload),
+            "",
+        )
+        verdict = str(raw).strip().lower()
         if verdict not in VERDICTS:
+            log.warning("judge returned an unrecognised verdict %r", raw)
             verdict = "unscored"
-        return Verdict(verdict, str(payload.get("reason", "")).strip(), self.model)
+        reason = next(
+            (payload[key] for key in ("reason", "explanation", "justification") if key in payload),
+            "",
+        )
+        return Verdict(verdict, str(reason).strip(), self.model)

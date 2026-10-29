@@ -493,3 +493,76 @@ def test_an_answer_is_returned_for_every_question_shape(retriever):
     ):
         answer = Agent(retriever, FakeClient(scripted)).answer("q")
         assert isinstance(answer, Answer)
+
+
+# ---------- the Groq client, used so the judge is a different model family ----------
+
+
+def test_gemini_messages_translate_to_the_openai_shape():
+    from ragsys.reasoning.llm import GroqClient, model_message, user_message
+
+    converted = GroqClient.to_openai_messages(
+        [user_message("a question"), model_message("an answer")], system="the rules"
+    )
+    assert converted == [
+        {"role": "system", "content": "the rules"},
+        {"role": "user", "content": "a question"},
+        {"role": "assistant", "content": "an answer"},
+    ]
+
+
+def test_a_message_with_no_text_is_skipped_rather_than_sent_empty():
+    """Tool-call parts have no text, and an empty message is not a message."""
+    from ragsys.reasoning.llm import GroqClient
+
+    converted = GroqClient.to_openai_messages(
+        [{"role": "user", "parts": [{"functionResponse": {"name": "x"}}]}], system=None
+    )
+    assert converted == []
+
+
+def test_groq_refuses_without_a_key():
+    from ragsys.reasoning.llm import GroqClient, LLMNotConfigured
+
+    with pytest.raises(LLMNotConfigured):
+        GroqClient(api_key="  ")
+
+
+def test_groq_keeps_its_fallbacks_when_a_model_is_named():
+    from ragsys.reasoning.llm import DEFAULT_GROQ_MODELS, GroqClient
+
+    client = GroqClient(model="llama-3.1-8b-instant", api_key="k")
+    assert client.models[0] == "llama-3.1-8b-instant"
+    assert set(client.models) >= {"llama-3.1-8b-instant"} | set(DEFAULT_GROQ_MODELS[:1])
+
+
+def test_a_groq_reply_is_parsed():
+    from ragsys.reasoning.llm import GroqClient
+
+    parsed = GroqClient._parse(
+        {
+            "choices": [
+                {"message": {"content": '{"verdict": "correct"}'}, "finish_reason": "stop"}
+            ],
+            "usage": {"prompt_tokens": 12, "completion_tokens": 4},
+        }
+    )
+    assert parsed.text == '{"verdict": "correct"}'
+    assert parsed.prompt_tokens == 12
+    assert not parsed.wants_tools
+
+
+def test_an_empty_groq_reply_raises():
+    from ragsys.reasoning.llm import GroqClient, LLMRefused
+
+    with pytest.raises(LLMRefused):
+        GroqClient._parse({"choices": []})
+
+
+def test_groq_offers_no_tools():
+    """The judge never calls tools, and silently dropping one would be worse."""
+    from ragsys.reasoning.llm import GroqClient, LLMNotConfigured, user_message
+
+    client = GroqClient(api_key="k")
+    with pytest.raises(LLMNotConfigured):
+        client.generate([user_message("x")], tools=[{"name": "search"}])

@@ -276,6 +276,10 @@ class FakeJudge:
         self.seen.append((reference, reference_is_behaviour))
         return Verdict(self.verdict, "because", self.model)
 
+    def named(self, model: str) -> FakeJudge:
+        self.model = model
+        return self
+
 
 class FakeAgent:
     def __init__(self, answer: Answer) -> None:
@@ -435,3 +439,35 @@ def test_citation_metrics_reach_the_report():
     stats = report.aggregate()
     assert stats["citation_validity"] == 1.0
     assert stats["citation_relevance"] == 1.0
+
+
+def test_two_judges_produce_a_measured_self_preference_gap():
+    """The gap between an independent and a same-family judge IS the bias.
+
+    Reporting it beats caveating it: one extra call per question turns a
+    disclaimer into a number measured on this system's own answers.
+    """
+    harness = Harness(FakeRetriever(["ops/incidents/INC-1.pdf"]))
+    strict = FakeJudge("partial").named("independent")
+    lenient = FakeJudge("correct").named("same-family")
+
+    report = harness.score_answers(
+        [question(question_id="q1"), question(question_id="q2")],
+        FakeAgent(answer()),
+        strict,
+        second_judge=lenient,
+    )
+    stats = report.aggregate()
+    assert stats["correctness"] == pytest.approx(0.5)
+    assert stats["correctness_secondary"] == pytest.approx(1.0)
+    assert stats["second_judge_gap"] == pytest.approx(0.5)
+    assert stats["judges_agree"] == 0.0
+    assert stats["double_graded"] == 2
+    assert report.judge_model_secondary == "same-family"
+
+
+def test_without_a_second_judge_no_gap_is_reported():
+    """Absent a second opinion, the report must not imply one."""
+    harness = Harness(FakeRetriever(["ops/incidents/INC-1.pdf"]))
+    report = harness.score_answers([question()], FakeAgent(answer()), FakeJudge())
+    assert "second_judge_gap" not in report.aggregate()

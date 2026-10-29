@@ -97,6 +97,47 @@ correctly from the incident report and the monthly operations report, while
 the key names the change log and the service catalogue. The same facts live in
 both. The metric is reported rather than optimised for exactly this reason.
 
+## The chunking strategies, compared on retrieval
+
+Stage 2 compared the two strategies on their properties — chunk counts, stored
+words, where they cut. That said how they differ, not which retrieves better.
+This answers that, with each strategy indexed into its own collection and the
+same 56 questions, the same four configurations, the same embedding model run
+against both. The only variable is where the text was cut.
+
+Best configuration for each, `hybrid+rerank`:
+
+| | R@5 | R@10 | R@15 | MRR | all gold found |
+|---|---|---|---|---|---|
+| **structural** | 68.6% | 78.9% | **87.9%** | **0.689** | 78.6% |
+| **fixed** | 68.6% | **81.5%** | **87.9%** | 0.660 | 78.6% |
+
+**They are equivalent on what matters most and differ in a way that makes
+sense.** Recall@15 is identical to the decimal, as is the proportion of
+questions retrieving every document they need. Where they part:
+
+- `fixed` finds more by rank 10, +2.6 points. Its 40-word overlap means a
+  fact sitting near a boundary appears whole in two chunks, so it has two
+  chances to surface.
+- `structural` ranks the first correct document higher, MRR 0.689 against
+  0.660, and the gap holds in both corpora separately: 0.566 against 0.536 on
+  the authored questions, 0.908 against 0.883 on HotpotQA. The same
+  duplication that gives `fixed` two chances also puts two near-identical
+  chunks in the ranking, and the second one displaces something else.
+
+**The default was right, and now for a stated reason rather than an
+assumption.** `structural` matches `fixed` on recall and completeness, ranks
+better, and stores **219,758 fewer words** — 3.8% less to embed, store and
+pay for. `fixed` buys a better rank-10 figure with duplication that costs
+storage and dilutes the top of the ranking.
+
+Worth being clear about what this does *not* show: both strategies use the
+same 160-word limit, so this compares boundary policy, not chunk size. The
+corpus profile is why — the median record is 78 words, so 92.6% of it is
+shorter than any sensible limit and would be unaffected by changing one.
+
+Reproduce with `uv run python scripts/compare_chunking.py`.
+
 # Failure analysis
 
 Six of 47 answers were not fully correct. Each was re-run through retrieval to
@@ -203,10 +244,12 @@ than a defect in the system.
 
 # Limitations of this evaluation
 
-- **The judge is from the same model family as the generator.** `gemini-3.5-flash`
-  grading `gemini-3.6-flash` reduces self-preference bias without eliminating
-  it, because both share training lineage. A genuinely independent judge needs
-  a second provider. Correctness of 89.4% should be read as optimistic.
+- **The judge is now independent.** Earlier figures were produced by
+  `gemini-3.5-flash` grading `gemini-3.6-flash` — different models, shared
+  training lineage — and were flagged as optimistic for that reason. Grading
+  now runs on `openai/gpt-oss-120b` via Groq, which shares no lineage with the
+  generator. The new judge is visibly stricter on hand-made cases, so the
+  figures it produces are expected to be lower and should be trusted more.
 - **Eleven of the thirteen simple questions are two templates**, six asking
   which team owns a service and five asking an incident's root cause. The
   96% score in that category reflects two question shapes answered repeatedly
@@ -219,10 +262,10 @@ than a defect in the system.
   compared across four, because it costs nothing; answer scoring costs roughly
   150 to 190 model requests, which is close to a day's entire free-tier
   allowance. The configuration comparison therefore rests on retrieval.
-- **The two chunking strategies were not compared on retrieval quality.** They
-  are compared on chunk counts, word totals and boundary behaviour; which one
-  retrieves better would need `fixed` chunks indexed into a second collection
-  and was not run.
+- **The chunking comparison uses one chunk size.** Both strategies cut at 160
+  words, so it compares boundary policy rather than size. Profiling showed a
+  larger limit would split almost nothing, which is why size was not the
+  variable.
 - **A scoring bug was found and fixed mid-evaluation**, and is recorded because
   it changed the numbers. Contradiction questions carry a null reference
   answer, since no single value is correct, and the first version rendered

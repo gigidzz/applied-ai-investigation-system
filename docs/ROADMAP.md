@@ -20,8 +20,8 @@ when it was written.
 | 6 | Evaluation | Automated harness over 40+ questions; Recall@K, MRR, answer correctness, citation accuracy, abstention precision; configuration comparison | done |
 | 7 | Interface | HTTP API and web UI for document management, querying and source inspection | done |
 | 8 | Hardening | Test coverage, retry and timeout behaviour, caching, token and cost accounting, observability | mostly absorbed |
-| 9 | Deployment | Public URL on free-tier hosting, persistent vector storage, protected secrets | next |
-| 10 | Documentation | Architecture write-up, evaluation report, AI usage report | |
+| 9 | Deployment | Public URL on free-tier hosting, persistent vector storage, protected secrets | done |
+| 10 | Documentation | Architecture write-up, evaluation report, AI usage report | next |
 
 ## Dependency order
 
@@ -274,11 +274,13 @@ resumable.
 quarter of an hour; losing that to a dropped connection near the end is not an
 acceptable failure mode, so progress is recorded per batch.
 
-**One strategy is indexed in full.** `structural` is the production index and
-is what satisfies the corpus-size requirement. `fixed` is indexed over a
-subset into a separate collection purely to compare the two strategies at
-stage 6; indexing both in full would double both the embedding time and the
-stored vectors to answer a question a subset answers just as well.
+**Both strategies are now indexed in full**, in separate collections, because
+comparing them on retrieval quality is a requirement and a subset would have
+left the result open to the objection that it depended on which documents were
+sampled. `structural` remains the production index: it matches `fixed` on
+recall@15 and on retrieving every needed document, ranks the first correct
+document higher, and stores 219,758 fewer words. The measurement is in
+docs/EVALUATION.md.
 
 ## Retrieval
 
@@ -750,6 +752,8 @@ property, or by two measurements disagreeing with each other.
 | 18 | `--progress` was defined but never passed to the harness, so a run could not resume | the progress file did not exist after a run | wire it through, and assert it by parsing the call site |
 | 19 | Re-uploading an unchanged file **deleted it from the index**: replacing removes the file's chunks first, then change detection reported UNCHANGED and skipped the write that would have restored them | uploading the same file twice through the running API | discard the previous state before ingesting, so every document in an upload is NEW and the write always happens |
 | 20 | An upload wrote **both** chunking strategies into a live index built with one, so each uploaded passage was stored twice under two chunkings and an uploaded document occupied twice the result slots of a bulk-loaded one | walking through what one uploaded file became in the database, and finding two rows both numbered `chunk 0` | uploads use `settings.chunk_strategy` alone; writing every strategy is correct only for the offline build that stage 6 compares |
+| 21 | Groq refused every request with HTTP 403 and body `error code: 1010`, which reads as an authentication failure and is not one | the models endpoint failed identically, so the key could not be the cause | Cloudflare blocks urllib's default agent; a `user-agent` header fixes it, and is now sent to both providers |
+| 22 | The judge prompt described what each verdict means but never named the JSON field it should appear in. One provider enforces a schema and papered over it; the other replied `{"score":"correct"}`, which parsed cleanly and scored as unscored | adding a second provider | the prompt states the exact object; verdict parsing also accepts synonyms rather than losing a judgement to a key name |
 
 Two patterns are worth naming.
 
@@ -766,7 +770,7 @@ numbers, not by review.** Defects 6, 10 and 12 were caught by assertions;
 defects 8, 13 and 14 were caught because two measurements disagreed. That is
 the argument for measuring the same thing two ways wherever it is cheap.
 
-**Three of the twenty are the same mistake**: an identifier that contains a
+**Three of the twenty-two are the same mistake**: an identifier that contains a
 date (4, 10) or a null that means two different things (13, 14). Both are
 cases where a value's *shape* was trusted instead of its *meaning*.
 
@@ -990,6 +994,27 @@ contradiction returns the same two times from the same two sources.
 `sentence-transformers` is kept in a `compare` dependency group so the
 measurement above can be reproduced, and is absent from the deployed image.
 
+## Hosting, verified live
+
+**https://document-investigation-system.onrender.com**
+
+Checked against the running service rather than assumed:
+
+| check | result |
+|---|---|
+| page served | HTTP 200 |
+| `/api/health` | 72,294 chunks, Qdrant reachable, model loaded |
+| planted contradiction | both times reported and attributed, conflict flagged, no invalid citations |
+| deliberate gap (kyc-service escalation) | abstained after two self-directed searches, and said what it *did* find |
+| upload | 1 chunk written, answered from the uploaded file |
+| delete | 1 chunk removed, index back to 72,294 |
+
+The abstention is the most telling of these: asked for the kyc-service
+escalation procedure, the deployed system reported that the sources mention an
+alert paging the on-call engineer but do not document an escalation procedure.
+That is the planted gap G2 described exactly, from a cold container, with no
+local state involved.
+
 ## Hosting, and the two hosts not used
 
 Measured first, then chosen. The service holds **345 MB** at peak, so the
@@ -1018,6 +1043,41 @@ The free plan sleeps after inactivity. A cold start pays container startup
 plus loading the model, which is seconds rather than minutes because the
 weights are baked into the image at build time and ONNX Runtime loads faster
 than PyTorch did.
+
+## An independent judge
+
+Answer correctness is graded by a model, because it cannot be computed: "15:10"
+and "ten past three" are the same answer with no characters in common. The
+risk in that is self-preference — models systematically prefer their own
+output — and the mitigation is to grade with a different model.
+
+Until now the judge was `gemini-3.5-flash` grading `gemini-3.6-flash`:
+different models, **same family and same training lineage**, which reduces
+self-preference without removing it. The reported 89.4% carried a caveat
+saying so.
+
+The judge is now **`openai/gpt-oss-120b` on Groq**, an open-weight model with
+no shared lineage with the generator, so the caveat can be dropped. Groq's
+free tier turned out to serve `gpt-oss` and `qwen` rather than the Llama
+models the documentation suggested — which suits this purpose better, since
+both are further from Gemini than Llama would have been.
+
+**This does not make the system better. It makes the measurement
+trustworthy, and probably lower.** Nothing about retrieval or answering
+changed; only who marks the work. On three hand-made cases the new judge was
+already stricter, scoring "The minimum is 25 [S1]" as *partial* against the
+reference "25 connections per pod" where it had been counted correct. If the
+final number falls, that is the point of the exercise rather than a
+regression.
+
+A secondary benefit: roughly fifty grading calls per run move off the Gemini
+quota, which is the constraint that broke the first evaluation attempt.
+
+Two defects surfaced from adding the second provider, both recorded in the
+defect log. One was a Cloudflare block that looked exactly like a rejected
+key. The other is the more interesting: **the judge prompt had never named
+the field it wanted**, and Gemini only complied because it is handed a schema
+it must obey. A single provider had been hiding a hole in the prompt.
 
 ## Design decisions already fixed
 

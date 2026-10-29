@@ -16,7 +16,7 @@ from typing import Any
 from ragsys.config import PROJECT_ROOT, settings
 from ragsys.evaluation.dataset import load
 from ragsys.evaluation.harness import Harness
-from ragsys.evaluation.judge import Judge
+from ragsys.evaluation.judge import Judge, build_sibling_judge
 from ragsys.indexing.embedder import Embedder
 from ragsys.indexing.sparse import SparseEncoder, SparseStats
 from ragsys.indexing.vector_store import QdrantChunkStore
@@ -67,6 +67,11 @@ def main() -> None:
         help="append each scored answer here, and resume from it",
     )
     parser.add_argument("--fresh", action="store_true", help="ignore and overwrite saved progress")
+    parser.add_argument(
+        "--compare-judges",
+        action="store_true",
+        help="also grade with a model from the generator's family, to measure self-preference",
+    )
     args = parser.parse_args()
 
     setup_logging("WARNING" if not args.answers else "INFO")
@@ -111,7 +116,14 @@ def main() -> None:
     if args.answers:
         print("\nANSWERS  (one generation call and one judge call per question)")
         agent = Agent(Retriever(store))
-        judge = Judge(generator_model=getattr(agent.client, "model", None))
+        generator = getattr(agent.client, "model", None)
+        judge = Judge(generator_model=generator)
+        second_judge = None
+        if args.compare_judges:
+            sibling = build_sibling_judge(generator)
+            if sibling is not None:
+                second_judge = Judge(client=sibling)
+                print(f"  second judge (same family as generator): {second_judge.model}")
         if args.fresh and args.progress.exists():
             args.progress.unlink()
         answers = harness.score_answers(
@@ -120,6 +132,7 @@ def main() -> None:
             judge,
             config_name=args.answer_config,
             progress=args.progress,
+            second_judge=second_judge,
         )
         report["answers"] = answers.as_dict()
         overall = answers.aggregate()
@@ -138,6 +151,16 @@ def main() -> None:
             value = overall.get(key)
             print(f"  {key:<24} {'n/a' if value is None else f'{value:.1%}'}")
         print(f"  model_failures           {overall['model_failures']}")
+        if overall.get("correctness_secondary") is not None:
+            print()
+            print(f"  SELF-PREFERENCE, on {overall['double_graded']} double-graded answers")
+            print(f"    independent judge ({answers.judge_model}): {overall['correctness']:.1%}")
+            print(
+                f"    same-family judge ({answers.judge_model_secondary}): "
+                f"{overall['correctness_secondary']:.1%}"
+            )
+            print(f"    gap                      {overall['second_judge_gap']:+.1%}")
+            print(f"    verdicts agreed          {overall['judges_agree']:.1%}")
         print(f"  mean tokens per question {overall['mean_tokens']:.0f}")
 
     args.out.parent.mkdir(parents=True, exist_ok=True)

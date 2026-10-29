@@ -27,6 +27,15 @@ from ragsys.logging import get_logger
 log = get_logger(__name__)
 
 GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+# Groq speaks the OpenAI chat format, so this client is most of an OpenAI
+# client too; only the base URL and the model names would change.
+GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions"
+
+# Sent on every request. Groq sits behind Cloudflare, which rejected requests
+# carrying urllib's default agent with HTTP 403 and Cloudflare error 1010 —
+# a block on the client fingerprint, not on the key, and indistinguishable
+# from an authentication failure without reading the body.
+USER_AGENT = "ragsys/1.0 (+https://github.com/gigidz/applied-ai-investigation-system)"
 # Tried in order. Two failure modes made this a list rather than a string,
 # both observed against this key within a minute of each other: a retired
 # alias answers 404 naming its replacement, and a popular model answers 503
@@ -129,10 +138,6 @@ class LLMUnavailable(LLMError):
 
 class LLMRefused(LLMError):
     """The model returned no usable content, for example on a safety stop."""
-
-
-class LLMBadResponse(LLMError):
-    """The response arrived but could not be parsed."""
 
 
 class _ModelUnusable(LLMError):
@@ -302,6 +307,7 @@ class GeminiClient:
                 headers={
                     "content-type": "application/json",
                     "x-goog-api-key": self._key,
+                    "user-agent": USER_AGENT,
                 },
             )
             try:
@@ -418,7 +424,186 @@ def build_client(provider: str | None = None, model: str | None = None) -> LLMCl
     chosen = provider or settings.llm_provider
     if chosen == "gemini":
         return GeminiClient(model=model)
+    if chosen == "groq":
+        key = settings.judge_api_key or settings.llm_api_key
+        return GroqClient(model=model, api_key=key.get_secret_value() if key else None)
     raise LLMNotConfigured(
-        f"provider {chosen!r} is configured but only 'gemini' has a client; "
-        "add one here or set LLM_PROVIDER=gemini"
+        f"provider {chosen!r} is configured but has no client; 'gemini' and 'groq' are implemented"
     )
+
+
+# Tried in order, same reasoning as the Gemini list: a free tier retires and
+# rate-limits models without warning, and failing a judgement while an
+# equivalent model is idle is not acceptable.
+# What a free Groq key actually serves, confirmed against the models endpoint
+# rather than assumed from documentation. Both are open-weight models with no
+# shared lineage with the generator, which is the whole point of using a
+# second provider to judge.
+DEFAULT_GROQ_MODELS = (
+    "openai/gpt-oss-120b",
+    "qwen/qwen3.8-27b",
+    "openai/gpt-oss-20b",
+)
+
+
+class GroqClient:
+    """Groq's OpenAI-compatible chat API.
+
+    Exists so the judge can be a genuinely different model family from the
+    generator. Grading an answer with a sibling of the model that wrote it
+    reduces self-preference without removing it, because both share training
+    lineage; a Llama model grading a Gemini answer does not.
+
+    Messages arrive in the Gemini shape, because that is what the rest of the
+    package speaks, and are translated here. Keeping the translation inside
+    the client means the judge and the agent need no provider-specific code.
+    """
+
+    def __init__(
+        self,
+        model: str | None = None,
+        api_key: str | None = None,
+        max_retries: int | None = None,
+        timeout: float | None = None,
+        fallbacks: tuple[str, ...] | None = None,
+        requests_per_minute: int | None = None,
+    ) -> None:
+        if not api_key or not api_key.strip():
+            raise LLMNotConfigured(
+                "Groq needs an API key; set JUDGE_API_KEY in .env or pass api_key="
+            )
+        self._key = api_key
+        candidates = list(fallbacks) if fallbacks is not None else list(DEFAULT_GROQ_MODELS)
+        if model:
+            candidates = [model, *(m for m in candidates if m != model)]
+        self.models = tuple(candidates)
+        self.model = self.models[0]
+        self.max_retries = settings.llm_max_retries if max_retries is None else max_retries
+        self.timeout = settings.llm_timeout_seconds if timeout is None else timeout
+        self.requests_per_minute = (
+            settings.llm_requests_per_minute if requests_per_minute is None else requests_per_minute
+        )
+
+    @staticmethod
+    def to_openai_messages(
+        messages: list[dict[str, Any]], system: str | None
+    ) -> list[dict[str, str]]:
+        """Translate the Gemini message shape into the OpenAI one.
+
+        Only text parts are carried across. The judge never calls tools, and
+        silently dropping a tool call would be worse than not supporting one,
+        so a message carrying only tool parts becomes empty and is skipped.
+        """
+        converted: list[dict[str, str]] = []
+        if system:
+            converted.append({"role": "system", "content": system})
+        for message in messages:
+            text = "".join(
+                str(part["text"]) for part in message.get("parts", []) if "text" in part
+            ).strip()
+            if not text:
+                continue
+            role = "assistant" if message.get("role") == "model" else "user"
+            converted.append({"role": role, "content": text})
+        return converted
+
+    def generate(
+        self,
+        messages: list[dict[str, Any]],
+        system: str | None = None,
+        tools: list[dict[str, Any]] | None = None,
+        response_schema: dict[str, Any] | None = None,
+        temperature: float = 0.0,
+    ) -> LLMResponse:
+        if tools:
+            raise LLMNotConfigured("the Groq client is used for judging and offers no tools")
+
+        body: dict[str, Any] = {
+            "messages": self.to_openai_messages(messages, system),
+            "temperature": temperature,
+        }
+        if response_schema is not None:
+            # The OpenAI-compatible API guarantees syntactically valid JSON
+            # but not the schema, so the caller still validates the fields.
+            body["response_format"] = {"type": "json_object"}
+
+        payload = self._post(body)
+        return self._parse(payload)
+
+    def _post(self, body: dict[str, Any]) -> dict[str, Any]:
+        _ensure_tls()
+        failures: list[str] = []
+        for model in self.models:
+            if _is_quota_blocked(model):
+                failures.append(f"{model}: quota known spent")
+                continue
+            try:
+                payload = self._post_to(model, body)
+            except _ModelUnusable as exc:
+                failures.append(f"{model}: {exc}")
+                if "429" in str(exc):
+                    _QUOTA_BLOCKED[model] = time.monotonic()
+                log.info("groq model %s unavailable (%s); trying the next", model, exc)
+                continue
+            _QUOTA_BLOCKED.pop(model, None)
+            self.model = model
+            return payload
+        raise LLMUnavailable("no Groq model answered -- " + "; ".join(failures))
+
+    def _post_to(self, model: str, body: dict[str, Any]) -> dict[str, Any]:
+        data = json.dumps({**body, "model": model}).encode("utf-8")
+        last: Exception | None = None
+        for attempt in range(1, self.max_retries + 1):
+            request = urllib.request.Request(
+                GROQ_ENDPOINT,
+                data=data,
+                headers={
+                    "content-type": "application/json",
+                    "authorization": f"Bearer {self._key}",
+                    "user-agent": USER_AGENT,
+                },
+            )
+            try:
+                _pace(self.requests_per_minute)
+                with urllib.request.urlopen(request, timeout=self.timeout) as response:
+                    return json.load(response)
+            except urllib.error.HTTPError as exc:
+                detail = self._describe(exc)
+                if exc.code in MOVE_ON_IMMEDIATELY:
+                    raise _ModelUnusable(f"HTTP {exc.code}: {detail}") from exc
+                if exc.code not in RETRYABLE_STATUS or attempt == self.max_retries:
+                    raise LLMUnavailable(f"HTTP {exc.code} from {model}: {detail}") from exc
+                last = exc
+            except (urllib.error.URLError, TimeoutError, OSError) as exc:
+                if attempt == self.max_retries:
+                    raise LLMUnavailable(f"could not reach {model}: {exc}") from exc
+                last = exc
+            delay = min(2.0**attempt, 8.0)
+            time.sleep(delay * (0.5 + random.random() / 2))
+        raise LLMUnavailable(f"exhausted {self.max_retries} attempts: {last}")
+
+    @staticmethod
+    def _describe(exc: urllib.error.HTTPError) -> str:
+        try:
+            body = json.load(exc)
+        except (json.JSONDecodeError, ValueError):
+            return exc.reason or "no detail"
+        message = str(body.get("error", {}).get("message", ""))
+        return message.split(". ")[0][:120] or exc.reason or "no detail"
+
+    @staticmethod
+    def _parse(payload: dict[str, Any]) -> LLMResponse:
+        choices = payload.get("choices") or []
+        if not choices:
+            raise LLMRefused("Groq returned no choices")
+        message = choices[0].get("message", {}) or {}
+        text = str(message.get("content") or "").strip()
+        if not text:
+            raise LLMRefused(f"empty content (finish={choices[0].get('finish_reason')!r})")
+        usage = payload.get("usage") or {}
+        return LLMResponse(
+            text=text,
+            finish_reason=str(choices[0].get("finish_reason", "")),
+            prompt_tokens=int(usage.get("prompt_tokens", 0) or 0),
+            output_tokens=int(usage.get("completion_tokens", 0) or 0),
+        )

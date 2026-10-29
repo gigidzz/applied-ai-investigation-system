@@ -164,7 +164,13 @@ none. Score "incorrect" if it contradicts the reference or misses its \
 substance. Score "abstained" if the answer declines to answer.
 
 Extra detail beyond the reference is not an error. Different wording is not an \
-error. A missing or wrong central fact is.\
+error. A missing or wrong central fact is.
+
+Reply with exactly this JSON object and nothing else, using these field names:
+
+{"verdict": "correct", "reason": "one short sentence"}
+
+"verdict" must be one of: correct, partial, incorrect, abstained.\
 """
 
 JUDGE_SCHEMA: dict[str, Any] = {

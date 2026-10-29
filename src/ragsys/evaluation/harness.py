@@ -128,10 +128,21 @@ class AnswerOutcome:
     tokens: int
     failed: bool
     error: str
+    # A second, optional grading of the same answer by a different judge.
+    # Present so self-preference can be measured rather than assumed: the
+    # gap between an independent judge and one sharing the generator's
+    # lineage is the bias, and it costs one extra call per question to know
+    # it instead of caveating it.
+    verdict_secondary: str = ""
+    reason_secondary: str = ""
 
     @property
     def credit(self) -> float:
         return {"correct": 1.0, "partial": 0.5}.get(self.verdict, 0.0)
+
+    @property
+    def credit_secondary(self) -> float:
+        return {"correct": 1.0, "partial": 0.5}.get(self.verdict_secondary, 0.0)
 
 
 @dataclass
@@ -141,6 +152,7 @@ class AnswerReport:
     judge_model: str
     outcomes: list[AnswerOutcome] = field(default_factory=list)
     seconds: float = 0.0
+    judge_model_secondary: str = ""
 
     def aggregate(self, subset: Sequence[AnswerOutcome] | None = None) -> dict[str, Any]:
         rows = list(subset if subset is not None else self.outcomes)
@@ -180,6 +192,29 @@ class AnswerReport:
             "model_failures": sum(1 for r in rows if r.failed),
             "mean_tokens": mean([float(r.tokens) for r in rows]),
             "mean_tool_calls": mean([float(r.tool_calls) for r in rows]),
+            **self._second_opinion(rows),
+        }
+
+    @staticmethod
+    def _second_opinion(rows: Sequence[AnswerOutcome]) -> dict[str, Any]:
+        """Correctness under the second judge, and the gap between them.
+
+        A positive gap means the second judge scored the same answers higher
+        than the first. With an independent judge first and a sibling of the
+        generator second, that gap is self-preference, measured on this
+        system's own output rather than quoted from the literature.
+        """
+        graded = [r for r in rows if r.verdict_secondary]
+        if not graded:
+            return {}
+        primary = mean([r.credit for r in graded])
+        secondary = mean([r.credit_secondary for r in graded])
+        agree = mean([1.0 if r.verdict == r.verdict_secondary else 0.0 for r in graded])
+        return {
+            "correctness_secondary": secondary,
+            "judges_agree": agree,
+            "second_judge_gap": secondary - primary,
+            "double_graded": len(graded),
         }
 
     def by_category(self) -> dict[str, dict[str, Any]]:
@@ -196,6 +231,7 @@ class AnswerReport:
             "config": self.config_name,
             "generator_model": self.generator_model,
             "judge_model": self.judge_model,
+            "judge_model_secondary": self.judge_model_secondary,
             "seconds": round(self.seconds, 2),
             "overall": self.aggregate(),
             "by_group": {k: self.aggregate(v) for k, v in sorted(groups.items())},
@@ -242,6 +278,7 @@ class Harness:
         judge: Judge,
         config_name: str = "hybrid+rerank",
         progress: Path | None = None,
+        second_judge: Judge | None = None,
     ) -> AnswerReport:
         """Score every question, optionally resuming a previous run.
 
@@ -256,6 +293,7 @@ class Harness:
             config_name=config_name,
             generator_model=getattr(agent.client, "model", "unknown"),
             judge_model=judge.model,
+            judge_model_secondary=second_judge.model if second_judge else "",
         )
 
         done: dict[str, AnswerOutcome] = {}
@@ -275,7 +313,8 @@ class Harness:
                     continue
                 answer = agent.answer(question.question)
                 verdict = self._verdict_for(question, answer, judge)
-                outcome = self._outcome(question, answer, verdict)
+                second = self._verdict_for(question, answer, second_judge) if second_judge else None
+                outcome = self._outcome(question, answer, verdict, second)
                 report.outcomes.append(outcome)
                 if handle:
                     handle.write(json.dumps(asdict(outcome)) + "\n")
@@ -321,7 +360,12 @@ class Harness:
         )
 
     @staticmethod
-    def _outcome(question: EvalQuestion, answer: Answer, verdict: Verdict) -> AnswerOutcome:
+    def _outcome(
+        question: EvalQuestion,
+        answer: Answer,
+        verdict: Verdict,
+        second: Verdict | None = None,
+    ) -> AnswerOutcome:
         return AnswerOutcome(
             question_id=question.question_id,
             category=question.category,
@@ -343,4 +387,6 @@ class Harness:
             tokens=answer.prompt_tokens + answer.output_tokens,
             failed=answer.failed,
             error=answer.error,
+            verdict_secondary=second.verdict if second else "",
+            reason_secondary=second.reason if second else "",
         )
